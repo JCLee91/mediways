@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { fetchPageContent } from './urlContentFetcher';
 import * as cheerio from 'cheerio';
 
 interface CrawlResult {
@@ -10,15 +10,9 @@ interface CrawlResult {
 
 export class BlogCrawlerService {
   // 네이버 블로그 URL 패턴 (모든 형식 지원)
-  // 1. https://blog.naver.com/아이디/12345678
-  // 2. https://blog.naver.com/PostView.naver?blogId=아이디&logNo=12345678
-  // 3. https://blog.naver.com/아이디?Redirect=Log&logNo=12345678
   static isNaverBlogUrl(url: string): boolean {
-    // 패턴 1: 기본 형식
     const pattern1 = /^https?:\/\/(m\.)?blog\.naver\.com\/[^\/]+\/\d+/;
-    // 패턴 2: PostView 형식
     const pattern2 = /^https?:\/\/(m\.)?blog\.naver\.com\/PostView\.naver\?.*blogId=.*&logNo=\d+/;
-    // 패턴 3: Redirect 형식
     const pattern3 = /^https?:\/\/(m\.)?blog\.naver\.com\/[^\/]+\?.*Redirect=Log.*&logNo=\d+/;
 
     return pattern1.test(url) || pattern2.test(url) || pattern3.test(url);
@@ -30,95 +24,60 @@ export class BlogCrawlerService {
     }
 
     try {
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-        timeout: 10000,
-      });
+      // 기존 검증된 urlContentFetcher 사용 (iframe + RSS fallback)
+      const pageContent = await fetchPageContent(url);
 
-      const html = response.data;
-      const $ = cheerio.load(html);
-
-      // iframe 콘텐츠 추출 (네이버 블로그 구조)
-      const iframeSrc = $('iframe#mainFrame').attr('src');
-      if (!iframeSrc) {
-        throw new Error('블로그 콘텐츠를 찾을 수 없습니다.');
+      if (!pageContent) {
+        throw new Error('블로그 콘텐츠를 가져올 수 없습니다.');
       }
 
-      // iframe 내부 HTML 다시 가져오기
-      const fullIframeUrl = iframeSrc.startsWith('http')
-        ? iframeSrc
-        : `https://blog.naver.com${iframeSrc}`;
+      if (!pageContent.content || pageContent.content.length < 100) {
+        throw new Error('블로그 콘텐츠가 너무 짧습니다. (최소 100자 이상 필요)');
+      }
 
-      const iframeResponse = await axios.get(fullIframeUrl, {
+      // 이미지 추출을 위해 HTML 한 번 더 가져오기 (선택적)
+      const images = await this.extractImages(url);
+
+      return {
+        title: pageContent.title || '제목 없음',
+        content: pageContent.content.slice(0, 10000),
+        images: images.slice(0, 10),
+      };
+    } catch (error: any) {
+      if (error.message.includes('가져올 수 없습니다')) {
+        throw error;
+      }
+      throw new Error(`블로그 크롤링 실패: ${error.message}`);
+    }
+  }
+
+  private static async extractImages(url: string): Promise<string[]> {
+    try {
+      const response = await fetch(url, {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-        timeout: 10000,
       });
 
-      const iframe$ = cheerio.load(iframeResponse.data);
+      if (!response.ok) return [];
 
-      // 제목 추출 (다양한 선택자 시도)
-      const title =
-        iframe$('.se-title-text').text().trim() ||
-        iframe$('.pcol1').text().trim() ||
-        iframe$('h3.se_textarea').text().trim() ||
-        '제목 없음';
-
-      // 본문 추출
-      const contentParagraphs: string[] = [];
-
-      // 다양한 선택자로 본문 추출 시도
-      iframe$('.se-main-container .se-text-paragraph').each((_, el) => {
-        const text = iframe$(el).text().trim();
-        if (text) contentParagraphs.push(text);
-      });
-
-      // 대체 선택자
-      if (contentParagraphs.length === 0) {
-        iframe$('.se-main-container p, .se-main-container div.se-text').each(
-          (_, el) => {
-            const text = iframe$(el).text().trim();
-            if (text) contentParagraphs.push(text);
-          }
-        );
-      }
-
-      const content = contentParagraphs.join('\n\n').slice(0, 10000);
-
-      if (!content || content.length < 100) {
-        throw new Error(
-          '블로그 콘텐츠가 너무 짧습니다. (최소 100자 이상 필요)'
-        );
-      }
-
-      // 이미지 추출
+      const html = await response.text();
+      const $ = cheerio.load(html);
       const images: string[] = [];
-      iframe$('.se-main-container img').each((_, el) => {
-        const src =
-          iframe$(el).attr('src') || iframe$(el).attr('data-lazy-src');
-        if (src && src.startsWith('http')) {
+
+      // 다양한 이미지 선택자 시도
+      $('img').each((_, el) => {
+        const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src');
+        if (src && src.startsWith('http') && !src.includes('icon') && !src.includes('logo')) {
           images.push(src);
         }
       });
 
-      return {
-        title,
-        content,
-        images: images.slice(0, 10), // 최대 10개
-      };
-    } catch (error: any) {
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('블로그 로딩 시간이 초과되었습니다. 다시 시도해주세요.');
-      }
-      if (error.response?.status === 404) {
-        throw new Error('블로그 글을 찾을 수 없습니다. URL을 확인해주세요.');
-      }
-      throw error;
+      return images;
+    } catch (error) {
+      console.warn('Image extraction failed:', error);
+      return [];
     }
   }
 }
