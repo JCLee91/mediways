@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Menu, X, LogOut, BarChart3, PenTool, Search, ChevronDown, ChevronRight } from "lucide-react";
+import { Menu, X, LogOut, BarChart3, PenTool, Search, ChevronDown, ChevronRight, Video } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -71,6 +71,7 @@ export default function Sidebar() {
         { href: '/sns', label: 'SNS 게시물' },
         { href: '/youtube', label: '유튜브' },
         { href: '/copywriting', label: '카피라이팅' },
+        { href: '/shorts', label: '블로그 쇼츠' },
       ]
     },
     {
