@@ -22,8 +22,10 @@ export class KieAiVideoGeneratorService {
         `${this.baseUrl}/veo/generate`,
         {
           prompt: request.prompt,
-          model: 'veo3_fast', // 빠른 생성 모드
-          aspect_ratio: request.aspectRatio,
+          model: 'veo3_fast',
+          aspectRatio: request.aspectRatio, // camelCase (문서 표준)
+          // videoLength는 공식 문서에 없는 파라미터이므로 제거
+          // 프롬프트에서 "8-second clip" 등으로 길이 제어
         },
         {
           headers: {
@@ -54,6 +56,8 @@ export class KieAiVideoGeneratorService {
 
         if (status === 401) {
           throw new Error('kie.ai API 키가 유효하지 않습니다.');
+        } else if (status === 402) {
+          throw new Error('크레딧이 부족합니다. kie.ai 계정에서 크레딧을 충전해주세요.');
         } else if (status === 429) {
           throw new Error('API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
         } else {
@@ -157,7 +161,14 @@ export class KieAiVideoGeneratorService {
       if (error.response) {
         const status = error.response.status;
         const message = error.response.data?.error || error.message;
-        throw new Error(`영상 확장 요청 실패: ${message}`);
+
+        if (status === 402) {
+          throw new Error('크레딧이 부족합니다. kie.ai 계정에서 크레딧을 충전해주세요.');
+        } else if (status === 501) {
+          throw new Error('영상 확장 작업이 실패했습니다. 원본 영상을 확인해주세요.');
+        } else {
+          throw new Error(`영상 확장 요청 실패: ${message}`);
+        }
       }
       throw error;
     }

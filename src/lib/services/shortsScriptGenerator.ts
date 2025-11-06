@@ -59,9 +59,9 @@ ${truncatedContent}
      * 환경: 조명, 분위기, 시간대
      * 카메라: 앵글, 무브먼트, 프레이밍
    - **쇼츠용 동적 프롬프트 예시**:
-     * 훅(첫 3초): "Close-up of patient's worried expression in modern clinic waiting room, nervously checking phone. Camera slowly pushes in, dramatic lighting, high contrast. Shot on 35mm film, cinematic style, 4K."
-     * 전개: "Professional doctor in white coat energetically walks through bright hospital corridor, greeting staff with confident smile. Camera tracking shot following movement, warm lighting, depth of field. Medical equipment visible in background."
-     * 결론: "Doctor and patient shake hands warmly in consultation room, both smiling with relief. Sunlight streaming through large windows, hopeful atmosphere. Medium shot with soft focus, uplifting mood, commercial quality."
+     * 훅(첫 3초): "8-second clip: Close-up of patient's worried expression in modern clinic waiting room, nervously checking phone. Camera slowly pushes in, dramatic lighting, high contrast. Shot on 35mm film, cinematic style, 4K."
+     * 전개: "8-second clip: Professional doctor in white coat energetically walks through bright hospital corridor, greeting staff with confident smile. Camera tracking shot following movement, warm lighting, depth of field. Medical equipment visible in background."
+     * 결론: "8-second clip: Doctor and patient shake hands warmly in consultation room, both smiling with relief. Sunlight streaming through large windows, hopeful atmosphere. Medium shot with soft focus, uplifting mood, commercial quality."
 
 **쇼츠 핵심 원칙**:
 - 정적 화면 금지 → 항상 움직임 포함 (걷기, 제스처, 카메라 무브먼트)
@@ -83,25 +83,26 @@ ${truncatedContent}
       "title": "훅 - 궁금증 유발",
       "content": "첫 3초 클립 내용 (충격적/흥미로운 문제 제기)",
       "order": 0,
-      "videoPrompt": "Extreme close-up of worried patient's eyes in dimly lit waiting room, hands trembling while holding medical report. Camera slowly zooms in, creating tension. High contrast dramatic lighting, cinematic 4K, shallow depth of field. Shot on 35mm film."
+      "videoPrompt": "8-second clip: Extreme close-up of worried patient's eyes in dimly lit waiting room, hands trembling while holding medical report. Camera slowly zooms in, creating tension. High contrast dramatic lighting, cinematic 4K, shallow depth of field. Shot on 35mm film."
     },
     {
       "title": "전개 - 해결책 제시",
       "content": "두 번째 클립 내용 (전문적인 설명)",
       "order": 1,
-      "videoPrompt": "Dynamic tracking shot of confident doctor in white coat walking briskly through modern hospital corridor, explaining treatment while gesturing expressively. Bright professional lighting, medical equipment visible. Medium shot with smooth camera movement, warm tones, 4K quality."
+      "videoPrompt": "8-second clip: Dynamic tracking shot of confident doctor in white coat walking briskly through modern hospital corridor, explaining treatment while gesturing expressively. Bright professional lighting, medical equipment visible. Medium shot with smooth camera movement, warm tones, 4K quality."
     },
     {
       "title": "결론 - 희망적 마무리",
       "content": "세 번째 클립 내용 (긍정적 결과)",
       "order": 2,
-      "videoPrompt": "Doctor and patient smiling warmly while shaking hands in bright consultation room, sunlight streaming through large windows creating hopeful atmosphere. Camera gently pulls back revealing modern clinic interior. Soft focus, uplifting mood, commercial quality, 4K."
+      "videoPrompt": "8-second clip: Doctor and patient smiling warmly while shaking hands in bright consultation room, sunlight streaming through large windows creating hopeful atmosphere. Camera gently pulls back revealing modern clinic interior. Soft focus, uplifting mood, commercial quality, 4K."
     }
   ],
   "totalDuration": 24
 }
 
 **중요**: 각 videoPrompt는 반드시 다음을 포함해야 함:
+- **"8-second clip:"으로 시작** (kie.ai API에 길이 명시)
 - 구체적인 감정/표정 (worried, confident, relieved, smiling)
 - 카메라 무브먼트 (zoom in, tracking, pull back, push in)
 - 조명 분위기 (dramatic, soft, bright, warm)
