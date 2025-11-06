@@ -48,6 +48,15 @@ export default function ShortsPage() {
       }
 
       setJobId(data.jobId);
+
+      // 백그라운드 처리 시작 (서버리스 환경 대응)
+      fetch(`/api/shorts/process/${data.jobId}`, {
+        method: 'POST',
+      }).catch((error) => {
+        console.error('Process API error:', error);
+      });
+
+      // 폴링 시작
       startPolling(data.jobId);
     } catch (error: any) {
       setError(error.message);

@@ -9,12 +9,19 @@ interface CrawlResult {
 }
 
 export class BlogCrawlerService {
-  // 네이버 블로그 URL 패턴 (일반형 + 리다이렉트형)
-  private static readonly NAVER_BLOG_PATTERN =
-    /^https?:\/\/(m\.)?blog\.naver\.com\/[^\/]+\/(\d+|.*?\?Redirect=Log&logNo=\d+)/;
-
+  // 네이버 블로그 URL 패턴 (모든 형식 지원)
+  // 1. https://blog.naver.com/아이디/12345678
+  // 2. https://blog.naver.com/PostView.naver?blogId=아이디&logNo=12345678
+  // 3. https://blog.naver.com/아이디?Redirect=Log&logNo=12345678
   static isNaverBlogUrl(url: string): boolean {
-    return this.NAVER_BLOG_PATTERN.test(url);
+    // 패턴 1: 기본 형식
+    const pattern1 = /^https?:\/\/(m\.)?blog\.naver\.com\/[^\/]+\/\d+/;
+    // 패턴 2: PostView 형식
+    const pattern2 = /^https?:\/\/(m\.)?blog\.naver\.com\/PostView\.naver\?.*blogId=.*&logNo=\d+/;
+    // 패턴 3: Redirect 형식
+    const pattern3 = /^https?:\/\/(m\.)?blog\.naver\.com\/[^\/]+\?.*Redirect=Log.*&logNo=\d+/;
+
+    return pattern1.test(url) || pattern2.test(url) || pattern3.test(url);
   }
 
   static async crawlNaverBlog(url: string): Promise<CrawlResult> {
