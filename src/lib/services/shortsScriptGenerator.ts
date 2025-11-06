@@ -39,7 +39,7 @@ ${truncatedContent}
 
 요구사항:
 1. 전체 요약: 3-5문장으로 핵심 내용만 간결하게 요약
-2. 영상 세그먼트: 3-4개의 8초 클립 구성
+2. 영상 세그먼트: 정확히 3개의 8초 클립 구성 (총 24초)
    - 각 세그먼트는 독립적인 장면
    - 스토리: 시작(문제/흥미) → 중간(전개/설명) → 끝(해결/결론)
 3. videoPrompt: 각 클립의 영상 생성용 프롬프트
@@ -104,8 +104,8 @@ ${truncatedContent}
         throw new Error('AI 응답 형식이 올바르지 않습니다.');
       }
 
-      if (result.segments.length < 3 || result.segments.length > 4) {
-        throw new Error('세그먼트는 3-4개여야 합니다.');
+      if (result.segments.length !== 3) {
+        throw new Error('세그먼트는 정확히 3개여야 합니다.');
       }
 
       // 각 세그먼트 검증

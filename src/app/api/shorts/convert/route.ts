@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('DB insert error:', error);
-      throw new Error('작업 생성에 실패했습니다.');
+      throw new Error(`작업 생성에 실패했습니다: ${error.message || JSON.stringify(error)}`);
     }
 
     // 작업 ID만 반환, 실제 처리는 클라이언트가 /api/shorts/process/[jobId]를 호출

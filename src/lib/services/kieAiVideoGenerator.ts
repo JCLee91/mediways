@@ -16,6 +16,8 @@ export class KieAiVideoGeneratorService {
 
   async generateVideo(request: VideoGenerationRequest): Promise<string> {
     try {
+      console.log('[kie.ai] Generating video with prompt:', request.prompt.slice(0, 100));
+
       const response = await axios.post(
         `${this.baseUrl}/veo/generate`,
         {
@@ -32,13 +34,19 @@ export class KieAiVideoGeneratorService {
         }
       );
 
-      const { taskId } = response.data;
+      console.log('[kie.ai] API Response:', JSON.stringify(response.data, null, 2));
 
-      if (!taskId) {
-        throw new Error('kie.ai API에서 taskId를 받지 못했습니다.');
+      // kie.ai API는 { code, msg, data: { taskId } } 형식으로 응답
+      const responseData = response.data.data || response.data;
+      const finalTaskId = responseData.taskId || responseData.task_id || responseData.id;
+
+      if (!finalTaskId) {
+        console.error('[kie.ai] No taskId in response:', response.data);
+        throw new Error(`kie.ai API에서 taskId를 받지 못했습니다. Response: ${JSON.stringify(response.data)}`);
       }
 
-      return taskId;
+      console.log('[kie.ai] Task created:', finalTaskId);
+      return finalTaskId;
     } catch (error: any) {
       if (error.response) {
         const status = error.response.status;
@@ -65,25 +73,39 @@ export class KieAiVideoGeneratorService {
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
 
       try {
-        const response = await axios.get(`${this.baseUrl}/veo/task/${taskId}`, {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-          },
-        });
+        const response = await axios.get(
+          `${this.baseUrl}/veo/record-info?taskId=${taskId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
 
-        const { status, videoUrl, error } = response.data;
+        console.log(`[kie.ai] Polling attempt ${attempt + 1}:`, JSON.stringify(response.data, null, 2));
 
-        if (status === 'completed' && videoUrl) {
-          return videoUrl;
+        // kie.ai는 { code, data: { successFlag, resultUrls } } 형식
+        const responseData = response.data.data || response.data;
+        const { successFlag, resultUrls } = responseData;
+
+        // successFlag: 0=생성중, 1=성공, 2/3=실패
+        if (successFlag === 1 && resultUrls) {
+          // resultUrls는 JSON 문자열 배열
+          const urls = JSON.parse(resultUrls);
+          if (urls && urls.length > 0) {
+            console.log(`[kie.ai] Video completed:`, urls[0]);
+            return urls[0];
+          }
         }
 
-        if (status === 'failed') {
-          throw new Error(`영상 생성 실패: ${error || '알 수 없는 오류'}`);
+        if (successFlag === 2 || successFlag === 3) {
+          throw new Error(`영상 생성 실패 (flag: ${successFlag})`);
         }
 
-        // pending, processing 상태면 계속 대기
+        // successFlag === 0: 계속 대기
         console.log(
-          `[kie.ai] Task ${taskId} status: ${status} (${attempt + 1}/${maxAttempts})`
+          `[kie.ai] Task ${taskId} generating... (${attempt + 1}/${maxAttempts})`
         );
       } catch (error: any) {
         if (error.response?.status === 404) {
@@ -97,6 +119,48 @@ export class KieAiVideoGeneratorService {
     throw new Error(
       `영상 생성 타임아웃 (최대 ${(maxAttempts * intervalMs) / 1000 / 60}분)`
     );
+  }
+
+  async extendVideo(previousTaskId: string, prompt: string): Promise<string> {
+    try {
+      console.log('[kie.ai] Extending video from task:', previousTaskId);
+      console.log('[kie.ai] Extension prompt:', prompt.slice(0, 100));
+
+      const response = await axios.post(
+        `${this.baseUrl}/veo/extend`,
+        {
+          taskId: previousTaskId,
+          prompt: prompt,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        }
+      );
+
+      console.log('[kie.ai] Extend API Response:', JSON.stringify(response.data, null, 2));
+
+      const responseData = response.data.data || response.data;
+      const finalTaskId = responseData.taskId || responseData.task_id || responseData.id;
+
+      if (!finalTaskId) {
+        console.error('[kie.ai] No taskId in extend response:', response.data);
+        throw new Error(`영상 확장 실패: taskId를 받지 못했습니다.`);
+      }
+
+      console.log('[kie.ai] Extension task created:', finalTaskId);
+      return finalTaskId;
+    } catch (error: any) {
+      if (error.response) {
+        const status = error.response.status;
+        const message = error.response.data?.error || error.message;
+        throw new Error(`영상 확장 요청 실패: ${message}`);
+      }
+      throw error;
+    }
   }
 
   async generateAndWaitForVideo(request: VideoGenerationRequest): Promise<string> {
