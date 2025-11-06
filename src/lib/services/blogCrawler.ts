@@ -9,8 +9,9 @@ interface CrawlResult {
 }
 
 export class BlogCrawlerService {
+  // 네이버 블로그 URL 패턴 (일반형 + 리다이렉트형)
   private static readonly NAVER_BLOG_PATTERN =
-    /^https?:\/\/(m\.)?blog\.naver\.com\/[^\/]+\/\d+/;
+    /^https?:\/\/(m\.)?blog\.naver\.com\/[^\/]+\/(\d+|.*?\?Redirect=Log&logNo=\d+)/;
 
   static isNaverBlogUrl(url: string): boolean {
     return this.NAVER_BLOG_PATTERN.test(url);

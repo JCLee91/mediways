@@ -102,7 +102,7 @@ export default function ShortsPage() {
               value={blogUrl}
               onChange={(e) => setBlogUrl(e.target.value)}
               required
-              disabled={isLoading || (status?.status !== 'completed' && status?.status !== 'failed')}
+              disabled={isLoading || (status !== null && status.status !== 'completed' && status.status !== 'failed')}
             />
             <p className="text-sm text-muted-foreground mt-2">
               의료 관련 블로그 글을 입력하시면 자동으로 쇼츠 영상을 생성합니다.
