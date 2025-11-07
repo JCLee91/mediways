@@ -52,11 +52,11 @@ async function handleCallback(payload: KieCallbackPayload) {
 
   const supabase = await createClient();
 
-  // taskId로 작업 찾기 (kie_task_id는 JSON 배열)
+  // taskId로 작업 찾기 (kie_task_id는 JSONB 배열)
   const { data: conversions, error: findError } = await supabase
     .from('shorts_conversions')
     .select('*')
-    .contains('kie_task_id', [taskId])
+    .contains('kie_task_id', [taskId])  // JSONB 배열에서 taskId 검색
     .order('created_at', { ascending: false })
     .limit(1);
 
@@ -71,22 +71,27 @@ async function handleCallback(payload: KieCallbackPayload) {
   const segments = conversion.segments || [];
   const totalSegments = segments.length;
 
+  // kie_task_id 배열 (JSONB)
+  const taskIds = Array.isArray(conversion.kie_task_id)
+    ? conversion.kie_task_id
+    : (conversion.kie_task_id ? [conversion.kie_task_id] : []);
+
   console.log(`[Callback] Job ${jobId}, Segment ${currentSegment}/${totalSegments}`);
 
   // 성공 케이스
   if (code === 200 && info?.resultUrls && info.resultUrls.length > 0) {
     const videoUrl = info.resultUrls[0];
 
-    // 현재 세그먼트 URL 저장
-    const existingUrls = conversion.raw_video_url
-      ? JSON.parse(conversion.raw_video_url)
-      : [];
+    // 현재 세그먼트 URL 저장 (JSONB 배열)
+    const existingUrls = Array.isArray(conversion.raw_video_url)
+      ? conversion.raw_video_url
+      : (conversion.raw_video_url ? [conversion.raw_video_url] : []);
     existingUrls.push(videoUrl);
 
     await supabase
       .from('shorts_conversions')
       .update({
-        raw_video_url: JSON.stringify(existingUrls),
+        raw_video_url: existingUrls, // JSONB로 직접 저장
         callback_received: true,
         last_callback_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -139,7 +144,11 @@ async function generateNextSegment(
   const supabase = await createClient();
   const segments = conversion.segments || [];
   const totalSegments = segments.length;
-  const taskIds = JSON.parse(conversion.kie_task_id || '[]');
+
+  // kie_task_id 배열 (JSONB)
+  const taskIds = Array.isArray(conversion.kie_task_id)
+    ? conversion.kie_task_id
+    : (conversion.kie_task_id ? [conversion.kie_task_id] : []);
   const previousTaskId = taskIds[taskIds.length - 1];
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
@@ -175,12 +184,12 @@ async function generateNextSegment(
       callBackUrl
     );
 
-    // taskId 배열에 추가
+    // taskId 배열에 추가 (JSONB)
     taskIds.push(extendTaskId);
     await supabase
       .from('shorts_conversions')
       .update({
-        kie_task_id: JSON.stringify(taskIds),
+        kie_task_id: taskIds, // JSONB로 직접 저장
       })
       .eq('id', jobId);
 
