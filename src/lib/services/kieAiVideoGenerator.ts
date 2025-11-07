@@ -47,7 +47,15 @@ export class KieAiVideoGeneratorService {
       console.log('[kie.ai] API Response:', JSON.stringify(response.data, null, 2));
 
       // kie.ai API는 { code, msg, data: { taskId } } 형식으로 응답
-      const responseData = response.data.data || response.data;
+      // HTTP 200이어도 response.data.code !== 200이면 오류
+      const { code, msg, data } = response.data;
+
+      if (code !== 200) {
+        console.error('[kie.ai] API error (code !== 200):', { code, msg });
+        throw new Error(`kie.ai API 오류 (code ${code}): ${msg}`);
+      }
+
+      const responseData = data || response.data;
       const finalTaskId = responseData.taskId || responseData.task_id || responseData.id;
 
       if (!finalTaskId) {
@@ -162,7 +170,15 @@ export class KieAiVideoGeneratorService {
 
       console.log('[kie.ai] Extend API Response:', JSON.stringify(response.data, null, 2));
 
-      const responseData = response.data.data || response.data;
+      // HTTP 200이어도 response.data.code !== 200이면 오류
+      const { code, msg, data } = response.data;
+
+      if (code !== 200) {
+        console.error('[kie.ai] Extend API error (code !== 200):', { code, msg });
+        throw new Error(`kie.ai 영상 확장 오류 (code ${code}): ${msg}`);
+      }
+
+      const responseData = data || response.data;
       const finalTaskId = responseData.taskId || responseData.task_id || responseData.id;
 
       if (!finalTaskId) {

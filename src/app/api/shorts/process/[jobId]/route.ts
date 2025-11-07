@@ -104,8 +104,26 @@ export async function POST(
     const segments = script.segments;
     const totalSegments = segments.length;
 
-    // Callback URL 설정
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
+    // Callback URL 설정 (Production 필수)
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+    if (!baseUrl) {
+      throw new Error(
+        'NEXT_PUBLIC_BASE_URL 환경변수가 설정되지 않았습니다. ' +
+        'kie.ai Callback을 받으려면 공개 URL이 필요합니다. ' +
+        'Vercel/배포 환경에서 설정해주세요.'
+      );
+    }
+
+    // localhost는 kie.ai에서 접근 불가
+    if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+      console.warn(
+        '[Warning] BASE_URL이 localhost입니다. ' +
+        'kie.ai Callback이 도달하지 못합니다. ' +
+        'ngrok 또는 배포 URL을 사용하세요.'
+      );
+    }
+
     const callBackUrl = `${baseUrl}/api/shorts/callback`;
 
     // 첫 번째 세그먼트 생성 (Callback 방식)

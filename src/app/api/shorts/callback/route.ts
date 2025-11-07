@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { KieAiVideoGeneratorService } from '@/lib/services/kieAiVideoGenerator';
 
 export const runtime = 'nodejs';
@@ -50,7 +50,8 @@ async function handleCallback(payload: KieCallbackPayload) {
   const { code, msg, data } = payload;
   const { taskId, info } = data;
 
-  const supabase = await createClient();
+  // Service Role 클라이언트 사용 (Webhook은 사용자 세션 없음)
+  const supabase = createServiceRoleClient();
 
   // taskId로 작업 찾기 (kie_task_id는 JSONB 배열)
   const { data: conversions, error: findError } = await supabase
@@ -141,7 +142,7 @@ async function generateNextSegment(
   conversion: any,
   nextSegmentIndex: number
 ) {
-  const supabase = await createClient();
+  const supabase = createServiceRoleClient();
   const segments = conversion.segments || [];
   const totalSegments = segments.length;
 
@@ -151,7 +152,12 @@ async function generateNextSegment(
     : (conversion.kie_task_id ? [conversion.kie_task_id] : []);
   const previousTaskId = taskIds[taskIds.length - 1];
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+
+  if (!baseUrl) {
+    throw new Error('NEXT_PUBLIC_BASE_URL is not configured');
+  }
+
   const callBackUrl = `${baseUrl}/api/shorts/callback`;
 
   console.log(`[Callback] Starting segment ${nextSegmentIndex}/${totalSegments}`);
