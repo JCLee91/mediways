@@ -5,7 +5,7 @@ import { ShortsScriptGeneratorService } from '@/lib/services/shortsScriptGenerat
 import { KieAiVideoGeneratorService } from '@/lib/services/kieAiVideoGenerator';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5분
+export const maxDuration = 60; // 1분 (Callback 방식이므로 짧게)
 
 export async function POST(
   request: NextRequest,
@@ -87,12 +87,12 @@ export async function POST(
 
     await updateProgress(jobId, 'summarizing', 40, 'AI 스크립트 작성 완료');
 
-    // 3. 영상 생성 - 모든 세그먼트 연속 생성 (40-90%)
+    // 3. 영상 생성 - Callback 방식으로 첫 번째 세그먼트만 시작 (40-45%)
     await updateProgress(
       jobId,
       'generating_video',
       45,
-      '첫 번째 클립 생성 중...'
+      '첫 번째 클립 생성 요청 중...'
     );
 
     const kieApiKey = process.env.KIE_AI_API_KEY;
@@ -103,88 +103,45 @@ export async function POST(
     const videoGenerator = new KieAiVideoGeneratorService(kieApiKey);
     const segments = script.segments;
     const totalSegments = segments.length;
-    const generatedTaskIds: string[] = [];
-    const videoUrls: string[] = [];
 
-    // 첫 번째 세그먼트 생성
+    // Callback URL 설정
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3002';
+    const callBackUrl = `${baseUrl}/api/shorts/callback`;
+
+    // 첫 번째 세그먼트 생성 (Callback 방식)
     const firstTaskId = await videoGenerator.generateVideo({
       prompt: segments[0].videoPrompt,
       aspectRatio: '9:16',
       duration: 8,
+      callBackUrl, // Callback URL 추가
     });
-    generatedTaskIds.push(firstTaskId);
+
+    // taskId 저장 및 current_segment 초기화
+    await supabase
+      .from('shorts_conversions')
+      .update({
+        kie_task_id: JSON.stringify([firstTaskId]),
+        current_segment: 0,
+        video_duration: totalSegments * 8,
+      })
+      .eq('id', jobId);
 
     await updateProgress(
       jobId,
       'generating_video',
       50,
-      '첫 번째 클립 대기 중...'
+      '첫 번째 클립 생성 중... (완료 시 자동으로 다음 클립 생성)'
     );
 
-    const firstVideoUrl = await videoGenerator.pollTaskStatus(firstTaskId);
-    videoUrls.push(firstVideoUrl);
+    console.log(`[Shorts] First segment task created: ${firstTaskId}`);
+    console.log(`[Shorts] Callback will handle remaining ${totalSegments - 1} segments`);
 
-    console.log(`[Shorts] First segment completed: ${firstVideoUrl}`);
-
-    // 나머지 세그먼트 extend로 연속 생성
-    for (let i = 1; i < totalSegments; i++) {
-      const progressPercent = 50 + (30 * (i / totalSegments));
-      await updateProgress(
-        jobId,
-        'generating_video',
-        Math.floor(progressPercent),
-        `${i + 1}번째 클립 생성 중...`
-      );
-
-      const extendTaskId = await videoGenerator.extendVideo(
-        generatedTaskIds[i - 1],
-        segments[i].videoPrompt
-      );
-      generatedTaskIds.push(extendTaskId);
-
-      await updateProgress(
-        jobId,
-        'generating_video',
-        Math.floor(progressPercent + 5),
-        `${i + 1}번째 클립 대기 중...`
-      );
-
-      const extendedVideoUrl = await videoGenerator.pollTaskStatus(extendTaskId);
-      videoUrls.push(extendedVideoUrl);
-
-      console.log(`[Shorts] Segment ${i + 1} completed: ${extendedVideoUrl}`);
-    }
-
-    // 모든 영상 URL 저장
-    const finalVideoUrl = videoUrls[videoUrls.length - 1]; // 마지막 확장된 영상이 전체 포함
-
-    await supabase
-      .from('shorts_conversions')
-      .update({
-        kie_task_id: JSON.stringify(generatedTaskIds),
-        raw_video_url: JSON.stringify(videoUrls),
-        final_video_url: finalVideoUrl,
-        video_duration: totalSegments * 8,
-      })
-      .eq('id', jobId);
-
-    await updateProgress(jobId, 'generating_video', 90, '영상 생성 완료');
-
-    // 4. 완료 (100%)
-    await supabase
-      .from('shorts_conversions')
-      .update({
-        status: 'completed',
-        progress: 100,
-        current_step: '완료!',
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', jobId);
-
+    // Callback이 나머지 처리하므로 여기서 즉시 응답
     return NextResponse.json({
       success: true,
-      message: '쇼츠 변환이 완료되었습니다.',
-      videoUrl: finalVideoUrl,
+      message: '쇼츠 변환이 시작되었습니다. 완료되면 자동으로 알려드립니다.',
+      taskId: firstTaskId,
+      jobId: jobId,
     });
   } catch (error: any) {
     console.error(`[${jobId}] Processing error:`, error);

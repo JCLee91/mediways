@@ -4,6 +4,7 @@ interface VideoGenerationRequest {
   prompt: string;
   aspectRatio: '9:16' | '16:9';
   duration: number;
+  callBackUrl?: string; // Callback URL (optional)
 }
 
 export class KieAiVideoGeneratorService {
@@ -18,15 +19,22 @@ export class KieAiVideoGeneratorService {
     try {
       console.log('[kie.ai] Generating video with prompt:', request.prompt.slice(0, 100));
 
+      const payload: Record<string, any> = {
+        prompt: request.prompt,
+        model: 'veo3_fast',
+        aspectRatio: request.aspectRatio, // camelCase (문서 표준)
+        // videoLength는 공식 문서에 없는 파라미터이므로 제거
+        // 프롬프트에서 "8-second clip" 등으로 길이 제어
+      };
+
+      // callBackUrl이 제공된 경우 추가
+      if (request.callBackUrl) {
+        payload.callBackUrl = request.callBackUrl;
+      }
+
       const response = await axios.post(
         `${this.baseUrl}/veo/generate`,
-        {
-          prompt: request.prompt,
-          model: 'veo3_fast',
-          aspectRatio: request.aspectRatio, // camelCase (문서 표준)
-          // videoLength는 공식 문서에 없는 파라미터이므로 제거
-          // 프롬프트에서 "8-second clip" 등으로 길이 제어
-        },
+        payload,
         {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
@@ -125,17 +133,24 @@ export class KieAiVideoGeneratorService {
     );
   }
 
-  async extendVideo(previousTaskId: string, prompt: string): Promise<string> {
+  async extendVideo(previousTaskId: string, prompt: string, callBackUrl?: string): Promise<string> {
     try {
       console.log('[kie.ai] Extending video from task:', previousTaskId);
       console.log('[kie.ai] Extension prompt:', prompt.slice(0, 100));
 
+      const extendPayload: Record<string, any> = {
+        taskId: previousTaskId,
+        prompt: prompt,
+      };
+
+      // callBackUrl이 제공된 경우 추가
+      if (callBackUrl) {
+        extendPayload.callBackUrl = callBackUrl;
+      }
+
       const response = await axios.post(
         `${this.baseUrl}/veo/extend`,
-        {
-          taskId: previousTaskId,
-          prompt: prompt,
-        },
+        extendPayload,
         {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
