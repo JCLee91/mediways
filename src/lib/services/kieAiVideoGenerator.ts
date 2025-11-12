@@ -78,20 +78,12 @@ export class KieAiVideoGeneratorService {
     return data.taskId;
   }
 
-  async pollUntilComplete(
-    taskId: string,
-    onProgress?: (attempt: number, maxAttempts: number) => void
-  ): Promise<string> {
-    const maxAttempts = 60;  // 최대 5분
-    const intervalMs = 5000;  // 5초마다
+  async pollUntilComplete(taskId: string): Promise<string> {
+    const maxAttempts = 60;
+    const intervalMs = 5000;
 
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(resolve => setTimeout(resolve, intervalMs));
-
-      // 진행 상황 콜백
-      if (onProgress) {
-        onProgress(i + 1, maxAttempts);
-      }
 
       const response = await axios.get(
         `${this.baseUrl}/veo/record-info?taskId=${taskId}`,
