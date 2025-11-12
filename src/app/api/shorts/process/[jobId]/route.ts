@@ -98,27 +98,33 @@ export async function POST(
     const segments = script.segments;
     const totalSegments = segments.length;
 
-    // 첫 번째 영상 생성
+    // 첫 번째 영상 생성 (45-60%)
     await updateProgress(jobId, 'generating_video', 45, '첫 번째 클립 생성 중...');
     const task1 = await videoGenerator.generateVideo({
       prompt: segments[0].videoPrompt,
       aspectRatio: '9:16',
       duration: 8,
     });
-    const url1 = await videoGenerator.pollUntilComplete(task1);
-    logger.info(`[${jobId}] Segment 1 완료: ${url1}`);
+    const url1 = await videoGenerator.pollUntilComplete(task1, (attempt, max) => {
+      const progress = 45 + Math.floor(15 * (attempt / max));
+      updateProgress(jobId, 'generating_video', progress, `첫 번째 클립 생성 중... (${attempt}/${max})`);
+    });
 
-    // 두 번째 영상 (extend)
+    // 두 번째 영상 (60-80%)
     await updateProgress(jobId, 'generating_video', 60, '두 번째 클립 생성 중...');
     const task2 = await videoGenerator.extendVideo(task1, segments[1].videoPrompt);
-    const url2 = await videoGenerator.pollUntilComplete(task2);
-    logger.info(`[${jobId}] Segment 2 완료: ${url2}`);
+    const url2 = await videoGenerator.pollUntilComplete(task2, (attempt, max) => {
+      const progress = 60 + Math.floor(20 * (attempt / max));
+      updateProgress(jobId, 'generating_video', progress, `두 번째 클립 생성 중... (${attempt}/${max})`);
+    });
 
-    // 세 번째 영상 (extend)
+    // 세 번째 영상 (80-100%)
     await updateProgress(jobId, 'generating_video', 80, '세 번째 클립 생성 중...');
     const task3 = await videoGenerator.extendVideo(task2, segments[2].videoPrompt);
-    const finalUrl = await videoGenerator.pollUntilComplete(task3);
-    logger.info(`[${jobId}] Segment 3 완료: ${finalUrl}`);
+    const finalUrl = await videoGenerator.pollUntilComplete(task3, (attempt, max) => {
+      const progress = 80 + Math.floor(20 * (attempt / max));
+      updateProgress(jobId, 'generating_video', progress, `세 번째 클립 생성 중... (${attempt}/${max})`);
+    });
 
     // 완료 처리
     await supabase

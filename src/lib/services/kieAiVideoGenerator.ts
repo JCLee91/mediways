@@ -78,12 +78,20 @@ export class KieAiVideoGeneratorService {
     return data.taskId;
   }
 
-  async pollUntilComplete(taskId: string): Promise<string> {
+  async pollUntilComplete(
+    taskId: string,
+    onProgress?: (attempt: number, maxAttempts: number) => void
+  ): Promise<string> {
     const maxAttempts = 60;  // 최대 5분
     const intervalMs = 5000;  // 5초마다
 
     for (let i = 0; i < maxAttempts; i++) {
       await new Promise(resolve => setTimeout(resolve, intervalMs));
+
+      // 진행 상황 콜백
+      if (onProgress) {
+        onProgress(i + 1, maxAttempts);
+      }
 
       const response = await axios.get(
         `${this.baseUrl}/veo/record-info?taskId=${taskId}`,
@@ -96,7 +104,6 @@ export class KieAiVideoGeneratorService {
 
       const { successFlag, resultUrls } = response.data.data || response.data;
 
-      // successFlag: 0=생성중, 1=성공, 2/3=실패
       if (successFlag === 1 && resultUrls) {
         const urls = JSON.parse(resultUrls);
         return urls[0];
