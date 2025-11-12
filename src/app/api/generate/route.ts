@@ -89,15 +89,15 @@ export async function POST(req: Request) {
       }
 
       const response = await generator.generateContent(body);
-      // Stream response from OpenAI
-      
+      // Stream response from OpenAI Responses API
+
       // 스트리밍 응답 처리 - ai 패키지가 기대하는 형식으로 변환
       const stream = new ReadableStream({
         async start(controller) {
           let fullContent = '';
           const encoder = new TextEncoder();
           let lastActivityTime = Date.now();
-          
+
           // 타임아웃 체크 (30초 동안 데이터 없으면 에러)
           const timeoutCheck = setInterval(() => {
             if (Date.now() - lastActivityTime > 30000) {
@@ -105,22 +105,21 @@ export async function POST(req: Request) {
               controller.error(new Error('Stream timeout - no data received for 30 seconds'));
             }
           }, 5000);
-          
+
           try {
-            for await (const chunk of response) {
-              lastActivityTime = Date.now(); // 활동 시간 업데이트
-              const content = chunk.choices[0]?.delta?.content || '';
-              if (content) {
-                fullContent += content;
-                // ai 패키지가 기대하는 형식으로 스트리밍
-                const formattedChunk = `0:"${content.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`;
-                controller.enqueue(encoder.encode(formattedChunk));
-              }
-              
-              // 스트림 종료 신호 확인
-              if (chunk.choices[0]?.finish_reason) {
-                // Stream finished
-                break;
+            // Responses API 스트림 이벤트 처리
+            for await (const event of response) {
+              lastActivityTime = Date.now();
+
+              // response.output_text.delta 이벤트에서 텍스트 추출
+              if (event.type === 'response.output_text.delta') {
+                const content = event.delta || '';
+                if (content) {
+                  fullContent += content;
+                  // ai 패키지가 기대하는 형식으로 스트리밍
+                  const formattedChunk = `0:"${content.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`;
+                  controller.enqueue(encoder.encode(formattedChunk));
+                }
               }
             }
             
