@@ -6,7 +6,7 @@ import { KieAiVideoGeneratorService } from '@/lib/services/kieAiVideoGenerator';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5분 (3개 영상 생성 + 폴링)
+export const maxDuration = 60; // 1분 (영상 생성 요청만)
 
 export async function POST(
   request: NextRequest,
@@ -88,7 +88,9 @@ export async function POST(
 
     await updateProgress(jobId, 'summarizing', 40, 'AI 스크립트 작성 완료');
 
-    // 3. 영상 생성 - 순차 처리 (Polling 방식)
+    // 3. 영상 생성 요청만 (polling은 status API에서)
+    await updateProgress(jobId, 'generating_video', 45, '영상 생성 중...');
+
     const kieApiKey = process.env.KIE_AI_API_KEY;
     if (!kieApiKey) {
       throw new Error('KIE_AI_API_KEY가 설정되지 않았습니다.');
@@ -96,44 +98,34 @@ export async function POST(
 
     const videoGenerator = new KieAiVideoGeneratorService(kieApiKey);
     const segments = script.segments;
-    const totalSegments = segments.length;
 
-    // 첫 번째 영상 생성
-    await updateProgress(jobId, 'generating_video', 45, '첫 번째 클립 생성 중...');
+    // 첫 번째 영상 요청
     const task1 = await videoGenerator.generateVideo({
       prompt: segments[0].videoPrompt,
       aspectRatio: '9:16',
       duration: 8,
     });
-    const url1 = await videoGenerator.pollUntilComplete(task1);
 
-    // 두 번째 영상
-    await updateProgress(jobId, 'generating_video', 60, '두 번째 클립 생성 중...');
+    // 두 번째 영상 요청 (extend)
     const task2 = await videoGenerator.extendVideo(task1, segments[1].videoPrompt);
-    const url2 = await videoGenerator.pollUntilComplete(task2);
 
-    // 세 번째 영상
-    await updateProgress(jobId, 'generating_video', 80, '세 번째 클립 생성 중...');
+    // 세 번째 영상 요청 (extend)
     const task3 = await videoGenerator.extendVideo(task2, segments[2].videoPrompt);
-    const finalUrl = await videoGenerator.pollUntilComplete(task3);
 
-    // 완료 처리
+    // taskId 저장 (마지막 task만 - extend 체인의 최종 결과)
     await supabase
       .from('shorts_conversions')
       .update({
-        status: 'completed',
-        progress: 100,
-        current_step: '완료!',
-        final_video_url: finalUrl,
-        video_duration: totalSegments * 8,
-        completed_at: new Date().toISOString(),
+        kie_task_id: task3,
+        video_duration: segments.length * 8,
       })
       .eq('id', jobId);
 
+    logger.info(`[${jobId}] Video generation requested: ${task3}`);
+
     return NextResponse.json({
       success: true,
-      message: '쇼츠 변환이 완료되었습니다.',
-      videoUrl: finalUrl,
+      message: '영상 생성이 시작되었습니다.',
     });
   } catch (error: any) {
     console.error(`[${jobId}] Processing error:`, error);
