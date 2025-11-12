@@ -143,7 +143,6 @@ export async function POST(
     );
 
     logger.info(`[${jobId}] First segment task created: ${firstTaskId}`);
-    logger.warn(`[${jobId}] Localhost callback 불가: 프로덕션에서 테스트 필요`);
 
     return NextResponse.json({
       success: true,
