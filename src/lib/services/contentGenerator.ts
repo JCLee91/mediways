@@ -23,53 +23,35 @@ export class ContentGeneratorService {
   async generateContent(request: GenerateContentRequest) {
     const { systemPrompt, userPrompt } = this.getPrompts(request);
 
+    // system + user 프롬프트 병합 (Responses API는 단일 input 사용)
+    const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+
     try {
       if (!this.openai) {
         throw new APIError('OpenAI API key not configured', 500, 'CONFIG_ERROR');
       }
-      const response = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+
+      // Responses API로 변경 (GPT-5-nano 사용)
+      const response = await this.openai.responses.create({
+        model: 'gpt-5-nano',
         stream: true,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        input: combinedPrompt,
+        reasoning: {
+          effort: 'minimal'  // reasoning 토큰 최소화
+        },
+        text: {
+          verbosity: 'medium'  // 블로그/콘텐츠는 적당한 길이 필요
+        }
       });
 
       return response;
     } catch (error: any) {
       console.error('OpenAI API Error:', error);
-      
-      if (error.status === 429) {
-        throw new APIError(
-          'API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
-          429,
-          'RATE_LIMIT_EXCEEDED'
-        );
-      }
-      
-      if (error.code === 'insufficient_quota') {
-        throw new APIError(
-          'OpenAI API 크레딧이 부족합니다. 관리자에게 문의해주세요.',
-          429,
-          'QUOTA_EXCEEDED'
-        );
-      }
-      
-      if (error.code === 'invalid_api_key') {
-        throw new APIError(
-          'OpenAI API 키가 유효하지 않습니다.',
-          401,
-          'INVALID_API_KEY'
-        );
-      }
-      
+
       throw new APIError(
-        '콘텐츠 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
-        500,
-        'GENERATION_ERROR'
+        'AI 서비스 오류입니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요.',
+        error.status || 500,
+        'OPENAI_ERROR'
       );
     }
   }

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { BlogCrawlerService } from '@/lib/services/blogCrawler';
 import { ShortsScriptGeneratorService } from '@/lib/services/shortsScriptGenerator';
 import { KieAiVideoGeneratorService } from '@/lib/services/kieAiVideoGenerator';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // 1분 (Callback 방식이므로 짧게)
@@ -104,41 +105,31 @@ export async function POST(
     const segments = script.segments;
     const totalSegments = segments.length;
 
-    // Callback URL 설정 (Production 필수)
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-
-    if (!baseUrl) {
-      throw new Error(
-        'NEXT_PUBLIC_BASE_URL 환경변수가 설정되지 않았습니다. ' +
-        'kie.ai Callback을 받으려면 공개 URL이 필요합니다. ' +
-        'Vercel/배포 환경에서 설정해주세요.'
-      );
-    }
-
-    // localhost는 kie.ai에서 접근 불가
-    if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
-      console.warn(
-        '[Warning] BASE_URL이 localhost입니다. ' +
-        'kie.ai Callback이 도달하지 못합니다. ' +
-        'ngrok 또는 배포 URL을 사용하세요.'
-      );
-    }
-
+    // Callback URL 설정
+    const host = request.headers.get('host');
+    const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
     const callBackUrl = `${baseUrl}/api/shorts/callback`;
+
+    logger.debug(`[${jobId}] Starting first video generation`, {
+      callBackUrl,
+      totalSegments,
+      promptPreview: segments[0].videoPrompt.slice(0, 50)
+    });
 
     // 첫 번째 세그먼트 생성 (Callback 방식)
     const firstTaskId = await videoGenerator.generateVideo({
       prompt: segments[0].videoPrompt,
       aspectRatio: '9:16',
       duration: 8,
-      callBackUrl, // Callback URL 추가
+      callBackUrl,
     });
 
     // taskId 저장 및 current_segment 초기화 (JSONB 배열)
     await supabase
       .from('shorts_conversions')
       .update({
-        kie_task_id: [firstTaskId], // JSONB 배열로 직접 저장
+        kie_task_id: [firstTaskId],
         current_segment: 0,
         video_duration: totalSegments * 8,
       })
@@ -151,10 +142,9 @@ export async function POST(
       '첫 번째 클립 생성 중... (완료 시 자동으로 다음 클립 생성)'
     );
 
-    console.log(`[Shorts] First segment task created: ${firstTaskId}`);
-    console.log(`[Shorts] Callback will handle remaining ${totalSegments - 1} segments`);
+    logger.info(`[${jobId}] First segment task created: ${firstTaskId}`);
+    logger.warn(`[${jobId}] Localhost callback 불가: 프로덕션에서 테스트 필요`);
 
-    // Callback이 나머지 처리하므로 여기서 즉시 응답
     return NextResponse.json({
       success: true,
       message: '쇼츠 변환이 시작되었습니다. 완료되면 자동으로 알려드립니다.',

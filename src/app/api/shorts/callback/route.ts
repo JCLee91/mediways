@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { KieAiVideoGeneratorService } from '@/lib/services/kieAiVideoGenerator';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // 1분
@@ -22,23 +23,21 @@ interface KieCallbackPayload {
 export async function POST(request: NextRequest) {
   try {
     const payload: KieCallbackPayload = await request.json();
+    const { taskId } = payload.data;
 
-    console.log('[Callback] Received:', JSON.stringify(payload, null, 2));
-
-    const { code, msg, data } = payload;
-    const { taskId, info, fallbackFlag } = data;
+    logger.info(`[Callback] Received webhook for taskId: ${taskId}`);
 
     // 1. 즉시 200 응답 (15초 내 필수)
     const response = NextResponse.json({ received: true, taskId });
 
     // 2. 비동기로 처리 (Promise를 기다리지 않음)
     handleCallback(payload).catch((error) => {
-      console.error('[Callback] Processing error:', error);
+      logger.error('[Callback] Processing error:', error);
     });
 
     return response;
   } catch (error: any) {
-    console.error('[Callback] Parse error:', error);
+    logger.error('[Callback] Parse error:', error);
     return NextResponse.json(
       { error: 'Invalid payload' },
       { status: 400 }
@@ -50,19 +49,18 @@ async function handleCallback(payload: KieCallbackPayload) {
   const { code, msg, data } = payload;
   const { taskId, info } = data;
 
-  // Service Role 클라이언트 사용 (Webhook은 사용자 세션 없음)
   const supabase = createServiceRoleClient();
 
   // taskId로 작업 찾기 (kie_task_id는 JSONB 배열)
   const { data: conversions, error: findError } = await supabase
     .from('shorts_conversions')
     .select('*')
-    .contains('kie_task_id', [taskId])  // JSONB 배열에서 taskId 검색
+    .contains('kie_task_id', [taskId])
     .order('created_at', { ascending: false })
     .limit(1);
 
   if (findError || !conversions || conversions.length === 0) {
-    console.error('[Callback] Conversion not found for taskId:', taskId);
+    logger.error(`[Callback] Conversion not found for taskId: ${taskId}`);
     return;
   }
 
@@ -72,12 +70,12 @@ async function handleCallback(payload: KieCallbackPayload) {
   const segments = conversion.segments || [];
   const totalSegments = segments.length;
 
+  logger.debug(`[Callback] Processing job ${jobId}, segment ${currentSegment}/${totalSegments}`);
+
   // kie_task_id 배열 (JSONB)
   const taskIds = Array.isArray(conversion.kie_task_id)
     ? conversion.kie_task_id
     : (conversion.kie_task_id ? [conversion.kie_task_id] : []);
-
-  console.log(`[Callback] Job ${jobId}, Segment ${currentSegment}/${totalSegments}`);
 
   // 성공 케이스
   if (code === 200 && info?.resultUrls && info.resultUrls.length > 0) {
@@ -92,14 +90,14 @@ async function handleCallback(payload: KieCallbackPayload) {
     await supabase
       .from('shorts_conversions')
       .update({
-        raw_video_url: existingUrls, // JSONB로 직접 저장
+        raw_video_url: existingUrls,
         callback_received: true,
         last_callback_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', jobId);
 
-    console.log(`[Callback] Segment ${currentSegment} completed:`, videoUrl);
+    logger.info(`[Callback] Segment ${currentSegment} completed`);
 
     // 다음 세그먼트 생성
     if (currentSegment < totalSegments - 1) {
@@ -112,18 +110,16 @@ async function handleCallback(payload: KieCallbackPayload) {
           status: 'completed',
           progress: 100,
           current_step: '완료!',
-          final_video_url: videoUrl, // 마지막 확장된 영상이 전체 포함
+          final_video_url: videoUrl,
           video_duration: totalSegments * 8,
           completed_at: new Date().toISOString(),
         })
         .eq('id', jobId);
 
-      console.log(`[Callback] All segments completed for job ${jobId}`);
+      logger.info(`[Callback] Job ${jobId} completed`);
     }
   } else {
     // 실패 케이스
-    console.error(`[Callback] Generation failed (code ${code}):`, msg);
-
     await supabase
       .from('shorts_conversions')
       .update({
@@ -134,6 +130,8 @@ async function handleCallback(payload: KieCallbackPayload) {
         last_callback_at: new Date().toISOString(),
       })
       .eq('id', jobId);
+
+    logger.error(`[Callback] Job ${jobId} failed: ${msg}`);
   }
 }
 
@@ -146,21 +144,13 @@ async function generateNextSegment(
   const segments = conversion.segments || [];
   const totalSegments = segments.length;
 
-  // kie_task_id 배열 (JSONB)
   const taskIds = Array.isArray(conversion.kie_task_id)
     ? conversion.kie_task_id
     : (conversion.kie_task_id ? [conversion.kie_task_id] : []);
   const previousTaskId = taskIds[taskIds.length - 1];
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
-
-  if (!baseUrl) {
-    throw new Error('NEXT_PUBLIC_BASE_URL is not configured');
-  }
-
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const callBackUrl = `${baseUrl}/api/shorts/callback`;
-
-  console.log(`[Callback] Starting segment ${nextSegmentIndex}/${totalSegments}`);
 
   // 진행률 업데이트
   const progress = 40 + Math.floor(50 * (nextSegmentIndex / totalSegments));
@@ -174,7 +164,6 @@ async function generateNextSegment(
     })
     .eq('id', jobId);
 
-  // extend 요청
   const kieApiKey = process.env.KIE_AI_API_KEY;
   if (!kieApiKey) {
     throw new Error('KIE_AI_API_KEY가 설정되지 않았습니다.');
@@ -190,18 +179,17 @@ async function generateNextSegment(
       callBackUrl
     );
 
-    // taskId 배열에 추가 (JSONB)
     taskIds.push(extendTaskId);
     await supabase
       .from('shorts_conversions')
       .update({
-        kie_task_id: taskIds, // JSONB로 직접 저장
+        kie_task_id: taskIds,
       })
       .eq('id', jobId);
 
-    console.log(`[Callback] Segment ${nextSegmentIndex} task created:`, extendTaskId);
+    logger.info(`[Callback] Segment ${nextSegmentIndex} task created: ${extendTaskId}`);
   } catch (error: any) {
-    console.error(`[Callback] Segment ${nextSegmentIndex} failed:`, error);
+    logger.error(`[Callback] Segment ${nextSegmentIndex} failed:`, error.message);
 
     await supabase
       .from('shorts_conversions')

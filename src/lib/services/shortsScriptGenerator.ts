@@ -24,13 +24,11 @@ export class ShortsScriptGeneratorService {
   async generateScript(title: string, content: string): Promise<ShortsScript> {
     const truncatedContent = content.slice(0, 8000);
 
-    const systemPrompt = `당신은 의료 콘텐츠를 YouTube 쇼츠로 변환하는 전문가입니다.
+    const prompt = `당신은 의료 콘텐츠를 YouTube 쇼츠로 변환하는 전문가입니다.
 
 ${medicalLawSystemPrompt}
 
-응답은 반드시 유효한 JSON 형식이어야 합니다.`;
-
-    const userPrompt = `다음은 의료 관련 블로그 글입니다. 이 글을 24-32초 YouTube 쇼츠 영상(8초 클립 3-4개)에 적합하게 구성해주세요.
+다음은 의료 관련 블로그 글입니다. 이 글을 24-32초 YouTube 쇼츠 영상(8초 클립 3-4개)에 적합하게 구성해주세요.
 
 제목: ${title}
 
@@ -110,41 +108,25 @@ ${truncatedContent}
 - 시네마틱 키워드 (4K, depth of field, cinematic)`;
 
     try {
-      const completion = await this.openai.chat.completions.create({
-        model: 'gpt-5-mini', // 최신 모델
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
-        max_tokens: 2000,
+      // Responses API 사용 (GPT-5 시리즈 권장)
+      const response = await this.openai.responses.create({
+        model: 'gpt-5-nano', // 요약/구조화 최적화, gpt-4o-mini보다 40% 저렴
+        input: prompt,
+        reasoning: {
+          effort: 'minimal'  // reasoning 토큰 최소화 (빠른 응답)
+        },
+        text: {
+          verbosity: 'low',  // 간결한 응답
+          format: { type: 'json_object' }  // JSON 출력
+        }
       });
 
-      const responseContent = completion.choices[0].message.content;
+      const responseContent = response.output_text;
       if (!responseContent) {
         throw new Error('AI 응답이 비어있습니다.');
       }
 
-      const result = JSON.parse(responseContent);
-
-      // 검증
-      if (!result.summary || !result.segments || !Array.isArray(result.segments)) {
-        throw new Error('AI 응답 형식이 올바르지 않습니다.');
-      }
-
-      if (result.segments.length !== 3) {
-        throw new Error('세그먼트는 정확히 3개여야 합니다.');
-      }
-
-      // 각 세그먼트 검증
-      for (const segment of result.segments) {
-        if (!segment.title || !segment.content || !segment.videoPrompt) {
-          throw new Error('세그먼트 정보가 불완전합니다.');
-        }
-      }
-
-      return result as ShortsScript;
+      return JSON.parse(responseContent) as ShortsScript;
     } catch (error: any) {
       if (error instanceof SyntaxError) {
         throw new Error('AI 응답을 파싱할 수 없습니다. 다시 시도해주세요.');

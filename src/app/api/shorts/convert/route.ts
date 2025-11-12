@@ -17,17 +17,9 @@ export async function POST(request: NextRequest) {
 
     const { blogUrl } = await request.json();
 
-    // URL 검증
     if (!blogUrl || typeof blogUrl !== 'string') {
       return NextResponse.json(
         { error: '블로그 URL을 입력해주세요.' },
-        { status: 400 }
-      );
-    }
-
-    if (!BlogCrawlerService.isNaverBlogUrl(blogUrl)) {
-      return NextResponse.json(
-        { error: '올바른 네이버 블로그 포스트 URL을 입력해주세요.' },
         { status: 400 }
       );
     }
