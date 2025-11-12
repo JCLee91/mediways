@@ -51,6 +51,17 @@ async function handleCallback(payload: KieCallbackPayload) {
 
   const supabase = createServiceRoleClient();
 
+  logger.debug(`[Callback] Searching for taskId: ${taskId}`);
+
+  // 디버깅: 모든 최근 작업 확인
+  const { data: allRecent } = await supabase
+    .from('shorts_conversions')
+    .select('id, kie_task_id, status')
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  logger.debug(`[Callback] Recent conversions:`, allRecent);
+
   // taskId로 작업 찾기 (kie_task_id는 JSONB 배열)
   const { data: conversions, error: findError } = await supabase
     .from('shorts_conversions')
@@ -59,8 +70,11 @@ async function handleCallback(payload: KieCallbackPayload) {
     .order('created_at', { ascending: false })
     .limit(1);
 
+  logger.debug(`[Callback] Query result:`, { conversions, findError });
+
   if (findError || !conversions || conversions.length === 0) {
     logger.error(`[Callback] Conversion not found for taskId: ${taskId}`);
+    logger.error(`[Callback] Find error:`, findError);
     return;
   }
 
