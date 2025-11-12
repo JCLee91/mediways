@@ -30,11 +30,16 @@ export default function ShortsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    console.log('[쇼츠 생성] 🎬 시작:', blogUrl);
+
+    // 즉시 로딩 상태로 전환 (UI 반응 보장)
     setIsLoading(true);
     setError(null);
     setStatus(null);
 
-    console.log('[쇼츠 생성] 🎬 시작:', blogUrl);
+    // React 상태 업데이트 반영 대기 (다음 프레임)
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     try {
       console.log('[쇼츠 생성] 📝 Step 1/4: 작업 생성 요청...');
@@ -62,12 +67,12 @@ export default function ShortsPage() {
       });
 
       console.log('[쇼츠 생성] 🔄 Step 3/4: 상태 모니터링 시작 (3초마다)...');
-      // 폴링 시작
+      // 폴링 시작 (로딩 상태 해제)
+      setIsLoading(false);
       startPolling(data.jobId);
     } catch (error: any) {
       console.error('[쇼츠 생성] ❌ 오류 발생:', error.message);
       setError(error.message);
-    } finally {
       setIsLoading(false);
     }
   };
