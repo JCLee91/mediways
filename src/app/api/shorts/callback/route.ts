@@ -27,15 +27,15 @@ export async function POST(request: NextRequest) {
 
     logger.info(`[Callback] Received webhook for taskId: ${taskId}`);
 
-    // 1. 즉시 200 응답 (15초 내 필수)
-    const response = NextResponse.json({ received: true, taskId });
-
-    // 2. 비동기로 처리 (Promise를 기다리지 않음)
-    handleCallback(payload).catch((error) => {
+    // handleCallback 실행 후 응답 (서버리스 환경에서 백그라운드 작업 보장)
+    try {
+      await handleCallback(payload);
+    } catch (error) {
       logger.error('[Callback] Processing error:', error);
-    });
+    }
 
-    return response;
+    // kie.ai 요구 형식으로 응답
+    return NextResponse.json({ code: 200, msg: "success" });
   } catch (error: any) {
     logger.error('[Callback] Parse error:', error);
     return NextResponse.json(
