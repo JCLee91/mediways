@@ -125,11 +125,11 @@ export async function POST(
       callBackUrl,
     });
 
-    // taskId 저장 및 current_segment 초기화 (JSONB 배열)
+    // taskId 저장 및 current_segment 초기화
     await supabase
       .from('shorts_conversions')
       .update({
-        kie_task_id: [firstTaskId],
+        kie_task_id: firstTaskId,  // TEXT 타입: 단일 값 저장
         current_segment: 0,
         video_duration: totalSegments * 8,
       })

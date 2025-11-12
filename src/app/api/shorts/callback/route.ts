@@ -51,34 +51,17 @@ async function handleCallback(payload: KieCallbackPayload) {
 
   const supabase = createServiceRoleClient();
 
-  logger.debug(`[Callback] Searching for taskId: ${taskId}`);
-
-  // 디버깅: 모든 최근 작업 확인
-  const { data: allRecent } = await supabase
-    .from('shorts_conversions')
-    .select('id, kie_task_id, status')
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  logger.debug(`[Callback] Recent conversions:`, allRecent);
-
-  // taskId로 작업 찾기 (kie_task_id는 JSONB 배열)
-  const { data: conversions, error: findError } = await supabase
+  // taskId로 작업 찾기 (단순 쿼리)
+  const { data: conversion, error: findError } = await supabase
     .from('shorts_conversions')
     .select('*')
-    .contains('kie_task_id', [taskId])
-    .order('created_at', { ascending: false })
-    .limit(1);
+    .eq('kie_task_id', taskId)
+    .single();
 
-  logger.debug(`[Callback] Query result:`, { conversions, findError });
-
-  if (findError || !conversions || conversions.length === 0) {
+  if (findError || !conversion) {
     logger.error(`[Callback] Conversion not found for taskId: ${taskId}`);
-    logger.error(`[Callback] Find error:`, findError);
     return;
   }
-
-  const conversion = conversions[0];
   const jobId = conversion.id;
   const currentSegment = conversion.current_segment || 0;
   const segments = conversion.segments || [];
@@ -86,28 +69,16 @@ async function handleCallback(payload: KieCallbackPayload) {
 
   logger.debug(`[Callback] Processing job ${jobId}, segment ${currentSegment}/${totalSegments}`);
 
-  // kie_task_id 배열 (JSONB)
-  const taskIds = Array.isArray(conversion.kie_task_id)
-    ? conversion.kie_task_id
-    : (conversion.kie_task_id ? [conversion.kie_task_id] : []);
-
   // 성공 케이스
   if (code === 200 && info?.resultUrls && info.resultUrls.length > 0) {
     const videoUrl = info.resultUrls[0];
 
-    // 현재 세그먼트 URL 저장 (JSONB 배열)
-    const existingUrls = Array.isArray(conversion.raw_video_url)
-      ? conversion.raw_video_url
-      : (conversion.raw_video_url ? [conversion.raw_video_url] : []);
-    existingUrls.push(videoUrl);
-
     await supabase
       .from('shorts_conversions')
       .update({
-        raw_video_url: existingUrls,
+        raw_video_url: videoUrl,  // TEXT: 현재 영상 URL만 저장
         callback_received: true,
         last_callback_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
       .eq('id', jobId);
 
@@ -157,11 +128,7 @@ async function generateNextSegment(
   const supabase = createServiceRoleClient();
   const segments = conversion.segments || [];
   const totalSegments = segments.length;
-
-  const taskIds = Array.isArray(conversion.kie_task_id)
-    ? conversion.kie_task_id
-    : (conversion.kie_task_id ? [conversion.kie_task_id] : []);
-  const previousTaskId = taskIds[taskIds.length - 1];
+  const previousTaskId = conversion.kie_task_id;  // TEXT: 현재 taskId
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   const callBackUrl = `${baseUrl}/api/shorts/callback`;
@@ -193,11 +160,11 @@ async function generateNextSegment(
       callBackUrl
     );
 
-    taskIds.push(extendTaskId);
+    // 새 taskId로 덮어쓰기 (단순)
     await supabase
       .from('shorts_conversions')
       .update({
-        kie_task_id: taskIds,
+        kie_task_id: extendTaskId,
       })
       .eq('id', jobId);
 
