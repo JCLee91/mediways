@@ -6,7 +6,7 @@ import { KieAiVideoGeneratorService } from '@/lib/services/kieAiVideoGenerator';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // 1분 (Callback 방식이므로 짧게)
+export const maxDuration = 300; // 5분 (3개 영상 생성 + 폴링)
 
 export async function POST(
   request: NextRequest,
@@ -88,14 +88,7 @@ export async function POST(
 
     await updateProgress(jobId, 'summarizing', 40, 'AI 스크립트 작성 완료');
 
-    // 3. 영상 생성 - Callback 방식으로 첫 번째 세그먼트만 시작 (40-45%)
-    await updateProgress(
-      jobId,
-      'generating_video',
-      45,
-      '첫 번째 클립 생성 요청 중...'
-    );
-
+    // 3. 영상 생성 - 순차 처리 (Polling 방식)
     const kieApiKey = process.env.KIE_AI_API_KEY;
     if (!kieApiKey) {
       throw new Error('KIE_AI_API_KEY가 설정되지 않았습니다.');
@@ -105,50 +98,45 @@ export async function POST(
     const segments = script.segments;
     const totalSegments = segments.length;
 
-    // Callback URL 설정
-    const host = request.headers.get('host');
-    const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
-    const callBackUrl = `${baseUrl}/api/shorts/callback`;
-
-    logger.debug(`[${jobId}] Starting first video generation`, {
-      callBackUrl,
-      totalSegments,
-      promptPreview: segments[0].videoPrompt.slice(0, 50)
-    });
-
-    // 첫 번째 세그먼트 생성 (Callback 방식)
-    const firstTaskId = await videoGenerator.generateVideo({
+    // 첫 번째 영상 생성
+    await updateProgress(jobId, 'generating_video', 45, '첫 번째 클립 생성 중...');
+    const task1 = await videoGenerator.generateVideo({
       prompt: segments[0].videoPrompt,
       aspectRatio: '9:16',
       duration: 8,
-      callBackUrl,
     });
+    const url1 = await videoGenerator.pollUntilComplete(task1);
+    logger.info(`[${jobId}] Segment 1 완료: ${url1}`);
 
-    // taskId 저장 및 current_segment 초기화
+    // 두 번째 영상 (extend)
+    await updateProgress(jobId, 'generating_video', 60, '두 번째 클립 생성 중...');
+    const task2 = await videoGenerator.extendVideo(task1, segments[1].videoPrompt);
+    const url2 = await videoGenerator.pollUntilComplete(task2);
+    logger.info(`[${jobId}] Segment 2 완료: ${url2}`);
+
+    // 세 번째 영상 (extend)
+    await updateProgress(jobId, 'generating_video', 80, '세 번째 클립 생성 중...');
+    const task3 = await videoGenerator.extendVideo(task2, segments[2].videoPrompt);
+    const finalUrl = await videoGenerator.pollUntilComplete(task3);
+    logger.info(`[${jobId}] Segment 3 완료: ${finalUrl}`);
+
+    // 완료 처리
     await supabase
       .from('shorts_conversions')
       .update({
-        kie_task_id: firstTaskId,
-        current_segment: 0,
+        status: 'completed',
+        progress: 100,
+        current_step: '완료!',
+        final_video_url: finalUrl,
         video_duration: totalSegments * 8,
+        completed_at: new Date().toISOString(),
       })
       .eq('id', jobId);
 
-    await updateProgress(
-      jobId,
-      'generating_video',
-      50,
-      '첫 번째 클립 생성 중... (완료 시 자동으로 다음 클립 생성)'
-    );
-
-    logger.info(`[${jobId}] First task: ${firstTaskId}`);
-
     return NextResponse.json({
       success: true,
-      message: '쇼츠 변환이 시작되었습니다. 완료되면 자동으로 알려드립니다.',
-      taskId: firstTaskId,
-      jobId: jobId,
+      message: '쇼츠 변환이 완료되었습니다.',
+      videoUrl: finalUrl,
     });
   } catch (error: any) {
     console.error(`[${jobId}] Processing error:`, error);

@@ -53,19 +53,13 @@ export class KieAiVideoGeneratorService {
     return data.taskId;
   }
 
-  async extendVideo(previousTaskId: string, prompt: string, callBackUrl?: string): Promise<string> {
-    const payload: Record<string, any> = {
-      taskId: previousTaskId,
-      prompt: prompt,
-    };
-
-    if (callBackUrl) {
-      payload.callBackUrl = callBackUrl;
-    }
-
+  async extendVideo(previousTaskId: string, prompt: string): Promise<string> {
     const response = await axios.post(
       `${this.baseUrl}/veo/extend`,
-      payload,
+      {
+        taskId: previousTaskId,
+        prompt: prompt,
+      },
       {
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
@@ -78,14 +72,41 @@ export class KieAiVideoGeneratorService {
     const { code, msg, data } = response.data;
 
     if (code !== 200) {
-      throw new Error(`kie.ai 영상 확장 오류 (code ${code}): ${msg}`);
+      throw new Error(`영상 확장 실패 (code ${code}): ${msg}`);
     }
 
-    if (!data.taskId) {
-      throw new Error('taskId를 받지 못했습니다.');
-    }
-
-    logger.info(`[kie.ai] Extend task created: ${data.taskId}`);
     return data.taskId;
+  }
+
+  async pollUntilComplete(taskId: string): Promise<string> {
+    const maxAttempts = 60;  // 최대 5분
+    const intervalMs = 5000;  // 5초마다
+
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+
+      const response = await axios.get(
+        `${this.baseUrl}/veo/record-info?taskId=${taskId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+          },
+        }
+      );
+
+      const { successFlag, resultUrls } = response.data.data || response.data;
+
+      // successFlag: 0=생성중, 1=성공, 2/3=실패
+      if (successFlag === 1 && resultUrls) {
+        const urls = JSON.parse(resultUrls);
+        return urls[0];
+      }
+
+      if (successFlag === 2 || successFlag === 3) {
+        throw new Error('영상 생성 실패');
+      }
+    }
+
+    throw new Error('타임아웃');
   }
 }
