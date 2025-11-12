@@ -34,7 +34,10 @@ export default function ShortsPage() {
     setError(null);
     setStatus(null);
 
+    console.log('[쇼츠 생성] 🎬 시작:', blogUrl);
+
     try {
+      console.log('[쇼츠 생성] 📝 Step 1/4: 작업 생성 요청...');
       const response = await fetch('/api/shorts/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -47,18 +50,22 @@ export default function ShortsPage() {
         throw new Error(data.error || '오류가 발생했습니다.');
       }
 
+      console.log('[쇼츠 생성] ✅ Step 1 완료: 작업 ID =', data.jobId);
       setJobId(data.jobId);
 
+      console.log('[쇼츠 생성] 🚀 Step 2/4: 변환 프로세스 시작...');
       // 백그라운드 처리 시작 (서버리스 환경 대응)
       fetch(`/api/shorts/process/${data.jobId}`, {
         method: 'POST',
       }).catch((error) => {
-        console.error('Process API error:', error);
+        console.error('[쇼츠 생성] ❌ Process API error:', error);
       });
 
+      console.log('[쇼츠 생성] 🔄 Step 3/4: 상태 모니터링 시작 (3초마다)...');
       // 폴링 시작
       startPolling(data.jobId);
     } catch (error: any) {
+      console.error('[쇼츠 생성] ❌ 오류 발생:', error.message);
       setError(error.message);
     } finally {
       setIsLoading(false);
@@ -66,18 +73,34 @@ export default function ShortsPage() {
   };
 
   const startPolling = (jobId: string) => {
+    let pollCount = 0;
     const interval = setInterval(async () => {
       try {
+        pollCount++;
         const response = await fetch(`/api/shorts/status/${jobId}`);
         const data = await response.json();
 
+        console.log(`[쇼츠 생성] 📊 상태 확인 #${pollCount}:`, {
+          status: data.status,
+          progress: `${data.progress}%`,
+          currentStep: data.currentStep
+        });
+
         setStatus(data);
 
-        if (data.status === 'completed' || data.status === 'failed') {
+        if (data.status === 'completed') {
           clearInterval(interval);
+          console.log('[쇼츠 생성] 🎉 Step 4/4: 완료!', {
+            videoUrl: data.result?.videoUrl,
+            duration: `${data.result?.duration}초`,
+            title: data.result?.title
+          });
+        } else if (data.status === 'failed') {
+          clearInterval(interval);
+          console.error('[쇼츠 생성] ❌ 실패:', data.error);
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        console.error('[쇼츠 생성] ⚠️ Polling error:', error);
       }
     }, 3000); // 3초마다 폴링
   };
