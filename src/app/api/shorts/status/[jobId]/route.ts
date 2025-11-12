@@ -30,33 +30,52 @@ export async function GET(
       return NextResponse.json({ error: '작업을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // kie.ai에서 실시간 상태 확인
+    // kie.ai에서 3개 영상 상태 확인
     if (conversion.kie_task_id && conversion.status === 'generating_video') {
       const kieApiKey = process.env.KIE_AI_API_KEY;
       if (kieApiKey) {
         try {
-          const response = await axios.get(
-            `https://api.kie.ai/api/v1/veo/record-info?taskId=${conversion.kie_task_id}`,
-            {
-              headers: { Authorization: `Bearer ${kieApiKey}` },
-              timeout: 5000,
+          const taskIds = JSON.parse(conversion.kie_task_id);
+          let completedCount = 0;
+          let finalVideoUrl = '';
+
+          // 3개 영상 상태 확인
+          for (const taskId of taskIds) {
+            const response = await axios.get(
+              `https://api.kie.ai/api/v1/veo/record-info?taskId=${taskId}`,
+              {
+                headers: { Authorization: `Bearer ${kieApiKey}` },
+                timeout: 5000,
+              }
+            );
+
+            const { successFlag, resultUrls } = response.data.data || response.data;
+
+            if (successFlag === 1 && resultUrls) {
+              completedCount++;
+              if (!finalVideoUrl) {
+                const urls = JSON.parse(resultUrls);
+                finalVideoUrl = urls[0];
+              }
             }
-          );
 
-          const { successFlag, resultUrls } = response.data.data || response.data;
+            if (successFlag === 2 || successFlag === 3) {
+              throw new Error('영상 생성 실패');
+            }
+          }
 
-          // 완료
-          if (successFlag === 1 && resultUrls) {
-            const urls = JSON.parse(resultUrls);
-            const videoUrl = urls[0];
+          // 진행률 계산
+          const progress = 45 + Math.floor(55 * (completedCount / taskIds.length));
 
+          // 모두 완료
+          if (completedCount === taskIds.length) {
             await supabase
               .from('shorts_conversions')
               .update({
                 status: 'completed',
                 progress: 100,
                 current_step: '완료!',
-                final_video_url: videoUrl,
+                final_video_url: finalVideoUrl,
                 completed_at: new Date().toISOString(),
               })
               .eq('id', jobId);
@@ -67,7 +86,7 @@ export async function GET(
               progress: 100,
               currentStep: '완료!',
               result: {
-                videoUrl,
+                videoUrl: finalVideoUrl,
                 duration: conversion.video_duration,
                 title: conversion.blog_title,
                 summary: conversion.summary,
@@ -75,26 +94,28 @@ export async function GET(
             });
           }
 
-          // 실패
-          if (successFlag === 2 || successFlag === 3) {
-            await supabase
-              .from('shorts_conversions')
-              .update({
-                status: 'failed',
-                error_message: '영상 생성 실패',
-              })
-              .eq('id', jobId);
-
-            return NextResponse.json({
-              jobId,
+          // 진행 중
+          return NextResponse.json({
+            jobId,
+            status: 'generating_video',
+            progress,
+            currentStep: `영상 생성 중... (${completedCount}/${taskIds.length})`,
+          });
+        } catch (err: any) {
+          await supabase
+            .from('shorts_conversions')
+            .update({
               status: 'failed',
-              progress: 0,
-              currentStep: '실패',
-              error: '영상 생성 실패',
-            });
-          }
-        } catch {
-          // kie.ai 오류는 무시하고 DB 상태 반환
+              error_message: err.message,
+            })
+            .eq('id', jobId);
+
+          return NextResponse.json({
+            jobId,
+            status: 'failed',
+            progress: 0,
+            error: err.message,
+          });
         }
       }
     }

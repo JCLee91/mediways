@@ -88,7 +88,7 @@ export async function POST(
 
     await updateProgress(jobId, 'summarizing', 40, 'AI 스크립트 작성 완료');
 
-    // 3. 영상 생성 요청만 (polling은 status API에서)
+    // 3. 영상 생성 요청 (3개 개별 생성)
     await updateProgress(jobId, 'generating_video', 45, '영상 생성 중...');
 
     const kieApiKey = process.env.KIE_AI_API_KEY;
@@ -99,29 +99,27 @@ export async function POST(
     const videoGenerator = new KieAiVideoGeneratorService(kieApiKey);
     const segments = script.segments;
 
-    // 첫 번째 영상 요청
-    const task1 = await videoGenerator.generateVideo({
-      prompt: segments[0].videoPrompt,
-      aspectRatio: '9:16',
-      duration: 8,
-    });
+    // 3개 영상 개별 생성 (extend 사용 안 함)
+    const taskIds = [];
+    for (const segment of segments) {
+      const taskId = await videoGenerator.generateVideo({
+        prompt: segment.videoPrompt,
+        aspectRatio: '9:16',
+        duration: 8,
+      });
+      taskIds.push(taskId);
+    }
 
-    // 두 번째 영상 요청 (extend)
-    const task2 = await videoGenerator.extendVideo(task1, segments[1].videoPrompt);
-
-    // 세 번째 영상 요청 (extend)
-    const task3 = await videoGenerator.extendVideo(task2, segments[2].videoPrompt);
-
-    // taskId 저장 (마지막 task만 - extend 체인의 최종 결과)
+    // taskIds 저장 (JSON 문자열로)
     await supabase
       .from('shorts_conversions')
       .update({
-        kie_task_id: task3,
+        kie_task_id: JSON.stringify(taskIds),  // TEXT 컬럼에 JSON 문자열 저장
         video_duration: segments.length * 8,
       })
       .eq('id', jobId);
 
-    logger.info(`[${jobId}] Video generation requested: ${task3}`);
+    logger.info(`[${jobId}] Video tasks created: ${taskIds.join(', ')}`);
 
     return NextResponse.json({
       success: true,
