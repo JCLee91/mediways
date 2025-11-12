@@ -160,15 +160,20 @@ async function generateNextSegment(
       callBackUrl
     );
 
-    // 새 taskId로 덮어쓰기 (단순)
-    await supabase
+    // 새 taskId로 덮어쓰기
+    const { error: updateError } = await supabase
       .from('shorts_conversions')
       .update({
         kie_task_id: extendTaskId,
       })
       .eq('id', jobId);
 
-    logger.info(`[Callback] Segment ${nextSegmentIndex} task created: ${extendTaskId}`);
+    if (updateError) {
+      logger.error(`[Callback] TaskId save failed:`, updateError);
+      throw new Error(`taskId 저장 실패: ${updateError.message}`);
+    }
+
+    logger.info(`[Callback] Segment ${nextSegmentIndex} task saved: ${extendTaskId}`);
   } catch (error: any) {
     logger.error(`[Callback] Segment ${nextSegmentIndex} failed:`, error.message);
 
