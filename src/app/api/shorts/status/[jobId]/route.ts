@@ -1,8 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import axios from 'axios';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
+
+async function mergeVideos(videoUrls: string[]): Promise<string> {
+  const ffmpeg = (await import('fluent-ffmpeg')).default;
+  const { path: ffmpegPath } = await import('@ffmpeg-installer/ffmpeg');
+
+  ffmpeg.setFfmpegPath(ffmpegPath);
+
+  const tempDir = path.join(os.tmpdir(), `shorts-${Date.now()}`);
+  await fs.mkdir(tempDir, { recursive: true });
+
+  // 다운로드
+  const inputPaths = await Promise.all(
+    videoUrls.map(async (url, i) => {
+      const outputPath = path.join(tempDir, `${i}.mp4`);
+      const response = await axios.get(url, { responseType: 'arraybuffer' });
+      await fs.writeFile(outputPath, Buffer.from(response.data));
+      return outputPath;
+    })
+  );
+
+  // 병합
+  const outputPath = path.join(tempDir, 'merged.mp4');
+  await new Promise((resolve, reject) => {
+    let command = ffmpeg();
+    inputPaths.forEach(p => command.input(p));
+    command
+      .on('end', resolve)
+      .on('error', reject)
+      .mergeToFile(outputPath, tempDir);
+  });
+
+  // Base64 인코딩
+  const buffer = await fs.readFile(outputPath);
+  const base64 = buffer.toString('base64');
+  const dataUrl = `data:video/mp4;base64,${base64}`;
+
+  // 정리
+  await fs.rm(tempDir, { recursive: true, force: true });
+
+  return dataUrl;
+}
 
 export async function GET(
   request: NextRequest,
@@ -37,7 +82,7 @@ export async function GET(
         try {
           const taskIds = JSON.parse(conversion.kie_task_id);
           let completedCount = 0;
-          let finalVideoUrl = '';
+          const videoUrls = [];
 
           // 3개 영상 상태 확인
           for (const taskId of taskIds) {
@@ -53,10 +98,8 @@ export async function GET(
 
             if (successFlag === 1 && resultUrls) {
               completedCount++;
-              if (!finalVideoUrl) {
-                const urls = JSON.parse(resultUrls);
-                finalVideoUrl = urls[0];
-              }
+              const urls = JSON.parse(resultUrls);
+              videoUrls.push(urls[0]);
             }
 
             if (successFlag === 2 || successFlag === 3) {
@@ -64,18 +107,28 @@ export async function GET(
             }
           }
 
-          // 진행률 계산
           const progress = 45 + Math.floor(55 * (completedCount / taskIds.length));
 
-          // 모두 완료
+          // 모두 완료 - 병합 시작
           if (completedCount === taskIds.length) {
+            await supabase
+              .from('shorts_conversions')
+              .update({
+                progress: 95,
+                current_step: '영상 병합 중...',
+              })
+              .eq('id', jobId);
+
+            // FFmpeg 병합
+            const mergedUrl = await mergeVideos(videoUrls);
+
             await supabase
               .from('shorts_conversions')
               .update({
                 status: 'completed',
                 progress: 100,
                 current_step: '완료!',
-                final_video_url: finalVideoUrl,
+                final_video_url: mergedUrl,
                 completed_at: new Date().toISOString(),
               })
               .eq('id', jobId);
@@ -86,7 +139,7 @@ export async function GET(
               progress: 100,
               currentStep: '완료!',
               result: {
-                videoUrl: finalVideoUrl,
+                videoUrl: mergedUrl,
                 duration: conversion.video_duration,
                 title: conversion.blog_title,
                 summary: conversion.summary,
