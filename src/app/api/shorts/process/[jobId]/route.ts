@@ -126,7 +126,7 @@ export async function POST(
     });
 
     // taskId 저장 및 current_segment 초기화
-    const { error: saveError } = await supabase
+    await supabase
       .from('shorts_conversions')
       .update({
         kie_task_id: firstTaskId,
@@ -135,11 +135,6 @@ export async function POST(
       })
       .eq('id', jobId);
 
-    if (saveError) {
-      logger.error(`[${jobId}] DB save failed:`, saveError);
-      throw new Error(`taskId 저장 실패: ${saveError.message}`);
-    }
-
     await updateProgress(
       jobId,
       'generating_video',
@@ -147,7 +142,7 @@ export async function POST(
       '첫 번째 클립 생성 중... (완료 시 자동으로 다음 클립 생성)'
     );
 
-    logger.info(`[${jobId}] TaskId saved to DB: ${firstTaskId}`);
+    logger.info(`[${jobId}] First task: ${firstTaskId}`);
 
     return NextResponse.json({
       success: true,
