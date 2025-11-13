@@ -39,13 +39,6 @@ export async function POST(
       );
     }
 
-    if (conversion.status !== 'pending') {
-      return NextResponse.json(
-        { error: '이미 처리 중이거나 완료된 작업입니다.' },
-        { status: 400 }
-      );
-    }
-
     const blogUrl = conversion.blog_url;
 
     // 1. 크롤링 (0-20%)
