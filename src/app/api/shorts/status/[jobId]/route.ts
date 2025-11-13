@@ -81,11 +81,22 @@ export async function GET(
       if (kieApiKey) {
         try {
           const taskIds = JSON.parse(conversion.kie_task_id);
+          const cachedUrls = conversion.video_urls || {};
+          const videoUrls: string[] = [];
           let completedCount = 0;
-          const videoUrls = [];
 
-          // 3개 영상 상태 확인
-          for (const taskId of taskIds) {
+          // 각 영상 상태 확인 (캐싱된 것은 kie.ai 호출 안 함)
+          for (let i = 0; i < taskIds.length; i++) {
+            const taskId = taskIds[i];
+
+            // 캐싱된 URL이 있으면 재사용
+            if (cachedUrls[i]) {
+              videoUrls[i] = cachedUrls[i];
+              completedCount++;
+              continue;
+            }
+
+            // 미완료 영상만 kie.ai 조회
             const response = await axios.get(
               `https://api.kie.ai/api/v1/veo/record-info?taskId=${taskId}`,
               {
@@ -97,12 +108,17 @@ export async function GET(
             const { successFlag, resultUrls } = response.data.data || response.data;
 
             if (successFlag === 1 && resultUrls) {
-              completedCount++;
               const urls = JSON.parse(resultUrls);
-              videoUrls.push(urls[0]);
-            }
+              videoUrls[i] = urls[0];
+              cachedUrls[i] = urls[0];
+              completedCount++;
 
-            if (successFlag === 2 || successFlag === 3) {
+              // DB에 캐싱
+              await supabase
+                .from('shorts_conversions')
+                .update({ video_urls: cachedUrls })
+                .eq('id', jobId);
+            } else if (successFlag === 2 || successFlag === 3) {
               throw new Error('영상 생성 실패');
             }
           }

@@ -110,7 +110,7 @@ export default function ShortsPage() {
       } catch (error) {
         console.error('[쇼츠 생성] ⚠️ Polling error:', error);
       }
-    }, 3000); // 3초마다 폴링
+    }, 30000); // 30초마다 폴링 (kie.ai 공식 권장)
   };
 
   const handleDownload = () => {
