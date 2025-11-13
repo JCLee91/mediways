@@ -59,12 +59,15 @@ export default function ShortsPage() {
       setJobId(data.jobId);
 
       console.log('[쇼츠 생성] 🚀 Step 2/4: 변환 프로세스 시작...');
-      // 백그라운드 처리 시작 (서버리스 환경 대응)
-      fetch(`/api/shorts/process/${data.jobId}`, {
+      // 백그라운드 처리 시작
+      const processResponse = await fetch(`/api/shorts/process/${data.jobId}`, {
         method: 'POST',
-      }).catch((error) => {
-        console.error('[쇼츠 생성] ❌ Process API error:', error);
       });
+
+      if (!processResponse.ok) {
+        const errorData = await processResponse.json();
+        throw new Error(`Process API 실패 (${processResponse.status}): ${errorData.error || '알 수 없는 오류'}`);
+      }
 
       console.log('[쇼츠 생성] 🔄 Step 3/4: 상태 모니터링 시작 (3초마다)...');
       // 폴링 시작 (로딩 상태 해제)
