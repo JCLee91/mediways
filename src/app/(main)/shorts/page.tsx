@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -33,13 +34,12 @@ export default function ShortsPage() {
 
     console.log('[쇼츠 생성] 🎬 시작:', blogUrl);
 
-    // 즉시 로딩 상태로 전환 (UI 반응 보장)
-    setIsLoading(true);
-    setError(null);
-    setStatus(null);
-
-    // React 상태 업데이트 반영 대기 (다음 프레임)
-    await new Promise(resolve => setTimeout(resolve, 0));
+    // flushSync로 즉시 렌더링 강제 (로딩 UI 즉시 표시)
+    flushSync(() => {
+      setIsLoading(true);
+      setError(null);
+      setStatus(null);
+    });
 
     try {
       console.log('[쇼츠 생성] 📝 Step 1/4: 작업 생성 요청...');
