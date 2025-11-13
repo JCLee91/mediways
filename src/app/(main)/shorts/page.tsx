@@ -69,9 +69,8 @@ export default function ShortsPage() {
         throw new Error(`Process API 실패 (${processResponse.status}): ${errorData.error || '알 수 없는 오류'}`);
       }
 
-      console.log('[쇼츠 생성] 🔄 Step 3/4: 상태 모니터링 시작 (3초마다)...');
-      // 폴링 시작 (로딩 상태 해제)
-      setIsLoading(false);
+      console.log('[쇼츠 생성] 🔄 Step 3/4: 상태 모니터링 시작 (30초마다)...');
+      // 폴링 시작 (로딩 스피너 계속 유지)
       startPolling(data.jobId);
     } catch (error: any) {
       console.error('[쇼츠 생성] ❌ 오류 발생:', error.message);
@@ -98,6 +97,7 @@ export default function ShortsPage() {
 
         if (data.status === 'completed') {
           clearInterval(interval);
+          setIsLoading(false);
           console.log('[쇼츠 생성] 🎉 Step 4/4: 완료!', {
             videoUrl: data.result?.videoUrl,
             duration: `${data.result?.duration}초`,
@@ -105,6 +105,7 @@ export default function ShortsPage() {
           });
         } else if (data.status === 'failed') {
           clearInterval(interval);
+          setIsLoading(false);
           console.error('[쇼츠 생성] ❌ 실패:', data.error);
         }
       } catch (error) {
