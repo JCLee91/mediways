@@ -45,6 +45,12 @@ ${truncatedContent}
      * 강렬한 시각적 요소
    - 스토리: 시작(훅) → 중간(핵심 정보) → 끝(행동 유도)
 3. videoPrompt: 각 클립의 영상 생성용 프롬프트 (Veo3 최적화)
+   - **쇼츠 최적화 핵심 전략 (FAST PACING & MONTAGE)**:
+     * 모든 8초 클립은 **반드시 2~3개의 장면이 빠르게 전환되는 '몽타주(Montage)' 형식**이어야 합니다.
+     * **Fast Cuts**: 장면이 2-3초마다 바뀌어야 지루하지 않습니다. "A scene fast cut to B scene" 형식을 사용하세요.
+     * **Keywords**: 반드시 \`montage\`, \`fast cut\`, \`rapid transition\`, \`dynamic sequence\` 등의 단어를 포함하세요.
+     * **구조**: [장면 1: 2-3초] -> [Fast Cut] -> [장면 2: 2-3초] -> [Fast Cut] -> [장면 3: 2-3초]
+
    - **Five Pillars Framework 적용**:
      * Subject: 누가 (의사, 환자, 의료진)
      * Action: 무엇을 (상담, 진료, 설명)
@@ -56,12 +62,13 @@ ${truncatedContent}
      * 동작: 구체적인 움직임, 시선, 제스처
      * 환경: 조명, 분위기, 시간대
      * 카메라: 앵글, 무브먼트, 프레이밍
-   - **쇼츠용 동적 프롬프트 예시**:
-     * 훅(첫 3초): "8-second clip: Close-up of patient's worried expression in modern clinic waiting room, nervously checking phone. Camera slowly pushes in, dramatic lighting, high contrast. Shot on 35mm film, cinematic style, 4K."
-     * 전개: "8-second clip: Professional doctor in white coat energetically walks through bright hospital corridor, greeting staff with confident smile. Camera tracking shot following movement, warm lighting, depth of field. Medical equipment visible in background."
-     * 결론: "8-second clip: Doctor and patient shake hands warmly in consultation room, both smiling with relief. Sunlight streaming through large windows, hopeful atmosphere. Medium shot with soft focus, uplifting mood, commercial quality."
+   - **쇼츠용 동적 프롬프트 예시 (반드시 이 형식을 따를 것)**:
+     * 훅(첫 3초): "8-second clip: Montage of anxiety. (0-2s) Extreme close-up of worried patient's eyes. Fast cut to (2-5s) Hands trembling with medical report. Fast cut to (5-8s) Clock ticking on wall. Cinematic 4K, rapid editing, high contrast."
+     * 전개: "8-second clip: Medical action sequence. (0-3s) Doctor walking briskly in corridor. Rapid transition to (3-6s) Doctor pointing at X-ray screen. Fast cut to (6-8s) Pen writing prescription. Professional lighting, fast paced, 4K."
+     * 결론: "8-second clip: Relief montage. (0-3s) Patient smiling with relief. Fast cut to (3-6s) Doctor and patient shaking hands warmly. Fast cut to (6-8s) Bright clinic exterior. Uplifting atmosphere, commercial quality."
 
 **쇼츠 핵심 원칙**:
+- **단일 장면 금지**: 8초 동안 한 장면만 나오면 안 됨. 무조건 컷 전환 포함.
 - 정적 화면 금지 → 항상 움직임 포함 (걷기, 제스처, 카메라 무브먼트)
 - 감정 표현 명확히 (worried, confident, relieved)
 - 조명과 분위기로 감정 강조
@@ -81,19 +88,19 @@ ${truncatedContent}
       "title": "훅 - 궁금증 유발",
       "content": "첫 3초 클립 내용 (충격적/흥미로운 문제 제기)",
       "order": 0,
-      "videoPrompt": "8-second clip: Extreme close-up of worried patient's eyes in dimly lit waiting room, hands trembling while holding medical report. Camera slowly zooms in, creating tension. High contrast dramatic lighting, cinematic 4K, shallow depth of field. Shot on 35mm film."
+      "videoPrompt": "8-second clip: Montage of anxiety. (0-2s) Extreme close-up of worried patient's eyes. Fast cut to (2-5s) Hands trembling with medical report. Fast cut to (5-8s) Clock ticking on wall. Cinematic 4K, rapid editing, high contrast."
     },
     {
       "title": "전개 - 해결책 제시",
       "content": "두 번째 클립 내용 (전문적인 설명)",
       "order": 1,
-      "videoPrompt": "8-second clip: Dynamic tracking shot of confident doctor in white coat walking briskly through modern hospital corridor, explaining treatment while gesturing expressively. Bright professional lighting, medical equipment visible. Medium shot with smooth camera movement, warm tones, 4K quality."
+      "videoPrompt": "8-second clip: Medical action sequence. (0-3s) Doctor walking briskly in corridor. Rapid transition to (3-6s) Doctor pointing at X-ray screen. Fast cut to (6-8s) Pen writing prescription. Professional lighting, fast paced, 4K."
     },
     {
       "title": "결론 - 희망적 마무리",
       "content": "세 번째 클립 내용 (긍정적 결과)",
       "order": 2,
-      "videoPrompt": "8-second clip: Doctor and patient smiling warmly while shaking hands in bright consultation room, sunlight streaming through large windows creating hopeful atmosphere. Camera gently pulls back revealing modern clinic interior. Soft focus, uplifting mood, commercial quality, 4K."
+      "videoPrompt": "8-second clip: Relief montage. (0-3s) Patient smiling with relief. Fast cut to (3-6s) Doctor and patient shaking hands warmly. Fast cut to (6-8s) Bright clinic exterior. Uplifting atmosphere, commercial quality."
     }
   ],
   "totalDuration": 24
@@ -101,6 +108,8 @@ ${truncatedContent}
 
 **중요**: 각 videoPrompt는 반드시 다음을 포함해야 함:
 - **"8-second clip:"으로 시작** (kie.ai API에 길이 명시)
+- **"Montage", "Fast cut", "Rapid transition" 키워드 필수 포함**
+- **2~3개의 서로 다른 장면 묘사**
 - 구체적인 감정/표정 (worried, confident, relieved, smiling)
 - 카메라 무브먼트 (zoom in, tracking, pull back, push in)
 - 조명 분위기 (dramatic, soft, bright, warm)
