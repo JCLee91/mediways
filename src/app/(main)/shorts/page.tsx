@@ -199,7 +199,7 @@ export default function ShortsPage() {
                 placeholder="https://blog.naver.com/..."
                 value={blogUrl}
                 onChange={(e) => setBlogUrl(e.target.value)}
-                disabled={isProcessing}
+                disabled={!!isProcessing}
                 className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-white font-bold placeholder-gray-500 focus:border-gray-700 focus:outline-none text-sm"
               />
               <p className="text-xs text-gray-500 mt-2">

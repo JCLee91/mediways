@@ -10,12 +10,20 @@ export const maxDuration = 300;
 
 // FFmpeg 초기화 함수
 const getFFmpeg = async () => {
+  const fluentFfmpeg = await import('fluent-ffmpeg');
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
-  const ffmpeg = (await import('fluent-ffmpeg')).default;
+  const ffmpeg = fluentFfmpeg.default || fluentFfmpeg;
+  
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   const ffmpegInstaller = await import('@ffmpeg-installer/ffmpeg');
   
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
   console.log(`[FFmpeg] Path: ${ffmpegInstaller.path}`);
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
   ffmpeg.setFfmpegPath(ffmpegInstaller.path);
   
   return ffmpeg;
