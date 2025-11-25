@@ -27,6 +27,8 @@ export class KieAiVideoGeneratorService {
       payload.callBackUrl = request.callBackUrl;
     }
 
+    console.log(`[KieAi] Generating video with model ${payload.model}. Prompt: ${payload.prompt.substring(0, 50)}...`);
+
     const response = await axios.post(
       `${this.baseUrl}/veo/generate`,
       payload,
@@ -50,6 +52,7 @@ export class KieAiVideoGeneratorService {
     }
 
     logger.info(`[kie.ai] Video task created: ${data.taskId}`);
+    console.log(`[KieAi] Task created: ${data.taskId}`);
     return data.taskId;
   }
 

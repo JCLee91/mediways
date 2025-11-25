@@ -24,6 +24,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 네이버 블로그 URL 형식 검증
+    const isNaverBlog = /^https?:\/\/(m\.)?blog\.naver\.com\//i.test(blogUrl);
+    if (!isNaverBlog) {
+      return NextResponse.json(
+        { error: '네이버 블로그 URL만 지원합니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 이미 진행 중인 작업이 있는지 확인 (중복 생성 방지)
+    const { data: existingJob } = await supabase
+      .from('shorts_conversions')
+      .select('id, status, blog_url')
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'crawling', 'summarizing', 'generating_video'])
+      .single();
+
+    if (existingJob) {
+      return NextResponse.json(
+        {
+          error: '이미 진행 중인 작업이 있습니다. 완료 후 다시 시도해주세요.',
+          existingJobId: existingJob.id,
+          existingStatus: existingJob.status
+        },
+        { status: 409 }
+      );
+    }
+
     // DB에 작업 생성
     const { data: conversion, error } = await supabase
       .from('shorts_conversions')

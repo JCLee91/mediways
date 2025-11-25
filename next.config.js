@@ -9,6 +9,7 @@ const nextConfig = {
       },
     ],
   },
+  serverExternalPackages: ['fluent-ffmpeg', '@ffmpeg-installer/ffmpeg'],
 };
 
 module.exports = nextConfig;

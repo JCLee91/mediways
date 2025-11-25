@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { BlogCrawlerService } from '@/lib/services/blogCrawler';
 import { ShortsScriptGeneratorService } from '@/lib/services/shortsScriptGenerator';
-import { KieAiVideoGeneratorService } from '@/lib/services/kieAiVideoGenerator';
+import { GrokImagineService } from '@/lib/services/grokImagineService';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -39,12 +39,25 @@ export async function POST(
       );
     }
 
+    // 이미 처리 중이거나 완료된 작업인지 확인 (중복 호출 방지)
+    if (conversion.status !== 'pending') {
+      return NextResponse.json(
+        {
+          error: '이미 처리 중이거나 완료된 작업입니다.',
+          currentStatus: conversion.status
+        },
+        { status: 409 }
+      );
+    }
+
     const blogUrl = conversion.blog_url;
+    console.log(`[Process] Job ${jobId}: Starting processing for ${blogUrl}`);
 
     // 1. 크롤링 (0-20%)
-    await updateProgress(jobId, 'crawling', 5, '블로그 콘텐츠를 가져오는 중...');
+    await updateProgress(jobId, 'crawling', 5, '블로그 내용을 분석하고 있습니다...');
 
     const crawlResult = await BlogCrawlerService.crawlNaverBlog(blogUrl);
+    console.log(`[Process] Job ${jobId}: Crawl complete. Title: ${crawlResult.title}`);
 
     await supabase
       .from('shorts_conversions')
@@ -55,10 +68,10 @@ export async function POST(
       })
       .eq('id', jobId);
 
-    await updateProgress(jobId, 'crawling', 20, '블로그 콘텐츠 가져오기 완료');
+    await updateProgress(jobId, 'crawling', 20, '블로그 분석이 완료되었습니다.');
 
     // 2. AI 요약 (20-40%)
-    await updateProgress(jobId, 'summarizing', 25, 'AI가 스크립트를 작성하는 중...');
+    await updateProgress(jobId, 'summarizing', 25, 'AI가 영상 대본을 작성하고 있습니다...');
 
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
@@ -70,6 +83,7 @@ export async function POST(
       crawlResult.title,
       crawlResult.content
     );
+    console.log(`[Process] Job ${jobId}: Script generated. Segments: ${script.segments.length}`);
 
     await supabase
       .from('shorts_conversions')
@@ -79,26 +93,27 @@ export async function POST(
       })
       .eq('id', jobId);
 
-    await updateProgress(jobId, 'summarizing', 40, 'AI 스크립트 작성 완료');
+    await updateProgress(jobId, 'summarizing', 40, '대본 작성이 완료되었습니다.');
 
     // 3. 영상 생성 요청 (3개 개별 생성)
-    await updateProgress(jobId, 'generating_video', 45, '영상 생성 중...');
+    await updateProgress(jobId, 'generating_video', 45, 'AI 영상 생성을 시작합니다...');
 
     const kieApiKey = process.env.KIE_AI_API_KEY;
     if (!kieApiKey) {
       throw new Error('KIE_AI_API_KEY가 설정되지 않았습니다.');
     }
 
-    const videoGenerator = new KieAiVideoGeneratorService(kieApiKey);
+    const grokService = new GrokImagineService(kieApiKey);
     const segments = script.segments;
 
     // 3개 영상 개별 생성 (extend 사용 안 함)
     const taskIds = [];
     for (const segment of segments) {
-      const taskId = await videoGenerator.generateVideo({
+      console.log(`[Process] Job ${jobId}: Requesting video for segment... Prompt: ${segment.videoPrompt.substring(0, 50)}...`);
+      const taskId = await grokService.generateVideo({
         prompt: segment.videoPrompt,
         aspectRatio: '9:16',
-        duration: 8,
+        mode: 'normal',
       });
       taskIds.push(taskId);
     }

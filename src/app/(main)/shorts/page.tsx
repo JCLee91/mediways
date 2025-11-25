@@ -1,12 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { flushSync } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Loader2, Video, Download, AlertCircle } from 'lucide-react';
+import { Loader2, Video, Download, AlertCircle, ArrowRight, Copy } from 'lucide-react';
+import { SimpleProcessStepper } from '@/components/shorts/SimpleProcessStepper';
+import Spinner from '@/components/Spinner';
 
 interface ConversionStatus {
   jobId: string;
@@ -28,17 +26,70 @@ export default function ShortsPage() {
   const [status, setStatus] = useState<ConversionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 부드러운 진행률 표시를 위한 state
+  const [displayProgress, setDisplayProgress] = useState(0);
+  
+  // 인풋 섹션의 높이를 추적하기 위한 ref
+  const inputSectionRef = useRef<HTMLDivElement>(null);
+  const [inputSectionHeight, setInputSectionHeight] = useState<number | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // 인풋 섹션 높이 감지
+  useEffect(() => {
+    if (!inputSectionRef.current) return;
 
+    const updateHeight = () => {
+      if (inputSectionRef.current) {
+        const height = inputSectionRef.current.offsetHeight;
+        setInputSectionHeight(height);
+      }
+    };
+
+    updateHeight();
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(inputSectionRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // 부드러운 진행률 업데이트
+  useEffect(() => {
+    if (!status) {
+      setDisplayProgress(0);
+      return;
+    }
+
+    const targetProgress = status.progress;
+    
+    // 이미 목표치에 도달했으면 중단
+    if (displayProgress >= targetProgress) return;
+
+    const step = () => {
+      setDisplayProgress(prev => {
+        if (prev >= targetProgress) return targetProgress;
+        // 남은 거리의 5%만큼 이동 (점진적 감속)하거나 최소 1씩 증가
+        const increment = Math.max(1, Math.floor((targetProgress - prev) * 0.1));
+        return Math.min(targetProgress, prev + increment);
+      });
+    };
+
+    const timer = setInterval(step, 50); // 50ms마다 업데이트
+
+    return () => clearInterval(timer);
+  }, [status?.progress]);
+
+  const handleSubmit = async () => {
+    if (!blogUrl) return;
+    
     console.log('[쇼츠 생성] 🎬 시작:', blogUrl);
 
-    // flushSync로 즉시 렌더링 강제 (로딩 UI 즉시 표시)
     flushSync(() => {
       setIsLoading(true);
       setError(null);
       setStatus(null);
+      setDisplayProgress(0);
     });
 
     try {
@@ -57,9 +108,15 @@ export default function ShortsPage() {
 
       console.log('[쇼츠 생성] ✅ Step 1 완료: 작업 ID =', data.jobId);
       setJobId(data.jobId);
+      
+      setStatus({
+        jobId: data.jobId,
+        status: 'pending',
+        progress: 0,
+        currentStep: '대기 중...'
+      });
 
       console.log('[쇼츠 생성] 🚀 Step 2/4: 변환 프로세스 시작...');
-      // 백그라운드 처리 시작
       const processResponse = await fetch(`/api/shorts/process/${data.jobId}`, {
         method: 'POST',
       });
@@ -69,8 +126,7 @@ export default function ShortsPage() {
         throw new Error(`Process API 실패 (${processResponse.status}): ${errorData.error || '알 수 없는 오류'}`);
       }
 
-      console.log('[쇼츠 생성] 🔄 Step 3/4: 상태 모니터링 시작 (30초마다)...');
-      // 폴링 시작 (로딩 스피너 계속 유지)
+      console.log('[쇼츠 생성] 🔄 Step 3/4: 상태 모니터링 시작...');
       startPolling(data.jobId);
     } catch (error: any) {
       console.error('[쇼츠 생성] ❌ 오류 발생:', error.message);
@@ -98,10 +154,10 @@ export default function ShortsPage() {
         if (data.status === 'completed') {
           clearInterval(interval);
           setIsLoading(false);
+          // 완료 시 진행률 100%로 즉시 설정
+          setDisplayProgress(100);
           console.log('[쇼츠 생성] 🎉 Step 4/4: 완료!', {
             videoUrl: data.result?.videoUrl,
-            duration: `${data.result?.duration}초`,
-            title: data.result?.title
           });
         } else if (data.status === 'failed') {
           clearInterval(interval);
@@ -111,7 +167,7 @@ export default function ShortsPage() {
       } catch (error) {
         console.error('[쇼츠 생성] ⚠️ Polling error:', error);
       }
-    }, 30000); // 30초마다 폴링 (kie.ai 공식 권장)
+    }, 5000);
   };
 
   const handleDownload = () => {
@@ -120,138 +176,197 @@ export default function ShortsPage() {
     }
   };
 
+  const isProcessing = isLoading || (status && status.status !== 'completed' && status.status !== 'failed');
+
   return (
-    <div className="container max-w-4xl py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">블로그 쇼츠 생성</h1>
-        <p className="text-muted-foreground">
-          네이버 블로그 URL을 입력하면 자동으로 YouTube 쇼츠 영상을 생성합니다.
-        </p>
+    <div className="min-h-screen flex flex-col lg:flex-row gap-2 p-1 sm:p-2">
+      {/* Left side input */}
+      <div 
+        ref={inputSectionRef}
+        className="w-full lg:w-[320px] xl:w-[360px] bg-black rounded-2xl p-4 sm:p-6"
+      >
+        <div className="w-full">
+          <h1 className="text-xl sm:text-2xl font-bold text-white mb-6 sm:mb-8">쇼츠 영상</h1>
+
+          {/* Form Fields */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm text-white font-bold mb-3">
+                네이버 블로그 URL <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="url"
+                placeholder="https://blog.naver.com/..."
+                value={blogUrl}
+                onChange={(e) => setBlogUrl(e.target.value)}
+                disabled={isProcessing}
+                className="w-full bg-black border border-gray-800 rounded-xl px-4 py-3 text-white font-bold placeholder-gray-500 focus:border-gray-700 focus:outline-none text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                의료 관련 블로그 글을 입력하시면 자동으로 쇼츠 영상을 생성합니다. (약 2-3분 소요)
+              </p>
+            </div>
+
+            {/* 에러 메시지 */}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-400">{error}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* 진행 상태 표시 (작업 시작 후) */}
+            {status && status.status !== 'completed' && status.status !== 'failed' && (
+               <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
+                 <SimpleProcessStepper status={status.status} />
+                 <div className="mt-4 flex justify-between items-center text-xs text-gray-400">
+                   <span>{status.currentStep}</span>
+                   <span>{displayProgress}%</span>
+                 </div>
+                 <div className="mt-2 h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-[#4f84f5] transition-all duration-500 ease-out"
+                      style={{ width: `${displayProgress}%` }}
+                    />
+                  </div>
+               </div>
+            )}
+
+            <button 
+              onClick={handleSubmit}
+              disabled={isProcessing || !blogUrl}
+              className="w-full bg-[#4f84f5] hover:bg-[#4574e5] disabled:bg-gray-800 disabled:text-gray-500 text-white py-3 sm:py-3.5 rounded-xl font-bold transition-colors text-sm flex items-center justify-center gap-2"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  생성 중...
+                </>
+              ) : (
+                <>
+                  <Video className="h-4 w-4" />
+                  쇼츠 생성하기
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* URL 입력 폼 */}
-      <Card className="p-6 mb-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="blogUrl" className="text-sm font-medium mb-2 block">
-              네이버 블로그 URL
-            </label>
-            <Input
-              id="blogUrl"
-              type="url"
-              placeholder="https://blog.naver.com/아이디/12345678"
-              value={blogUrl}
-              onChange={(e) => setBlogUrl(e.target.value)}
-              required
-              disabled={isLoading || (status !== null && status.status !== 'completed' && status.status !== 'failed')}
-            />
-            <p className="text-sm text-muted-foreground mt-2">
-              의료 관련 블로그 글을 입력하시면 자동으로 쇼츠 영상을 생성합니다.
-              (약 2-3분 소요)
-            </p>
-          </div>
-
-          <Button
-            type="submit"
-            disabled={isLoading || (status !== null && status.status !== 'completed' && status.status !== 'failed')}
-            className="w-full"
+      {/* Right side output */}
+      <div className="flex-1 flex items-start justify-center mt-2 lg:mt-0">
+        <div className="w-full max-w-none">
+          <div 
+            className="bg-black border border-gray-800 rounded-2xl p-4 sm:p-6 relative overflow-hidden min-h-[600px] flex flex-col items-center justify-center"
+            style={inputSectionHeight ? { 
+              minHeight: `${inputSectionHeight}px` 
+            } : undefined}
           >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                생성 중...
-              </>
-            ) : (
-              <>
-                <Video className="mr-2 h-4 w-4" />
-                쇼츠 생성하기
-              </>
-            )}
-          </Button>
-        </form>
-
-        {error && (
-          <div className="mt-4 p-4 bg-destructive/10 text-destructive rounded-lg flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold">오류 발생</p>
-              <p className="text-sm">{error}</p>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* 진행 상황 */}
-      {status && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">진행 상황</h3>
-
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-medium">{status.currentStep}</span>
-                <span className="text-sm text-muted-foreground">
-                  {status.progress}%
-                </span>
+            {/* 초기 상태 */}
+            {!status && !isProcessing && !error && (
+              <div className="text-center">
+                <p className="text-base sm:text-lg text-white mb-1">클릭 한 번으로 블로그를 영상으로</p>
+                <p className="text-base sm:text-lg text-white">쇼츠 영상 생성하기!</p>
               </div>
-              <Progress value={status.progress} className="h-2" />
-            </div>
+            )}
 
-            {status.status === 'completed' && status.result && (
-              <div className="mt-6 space-y-6">
-                <div className="border-t pt-6">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <Video className="h-5 w-5" />
-                    생성된 영상
-                  </h4>
-                  <div className="bg-black rounded-lg overflow-hidden">
-                    <video
-                      src={status.result.videoUrl}
-                      controls
-                      className="w-full"
-                      style={{ maxHeight: '600px' }}
+            {/* 로딩/진행 중 상태 */}
+            {isProcessing && status?.status !== 'completed' && (
+              <div className="flex flex-col items-center w-full max-w-xs">
+                <div className="relative mb-8">
+                  {/* 배경 원 */}
+                  <div className="w-24 h-24 rounded-full border-4 border-gray-800 opacity-30"></div>
+                  {/* 진행률 원 (SVG) */}
+                  <svg className="absolute top-0 left-0 w-24 h-24 transform -rotate-90">
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r="44"
+                      stroke="#4f84f5"
+                      strokeWidth="4"
+                      fill="none"
+                      strokeDasharray="276.46"
+                      strokeDashoffset={276.46 * (1 - displayProgress / 100)}
+                      className="transition-all duration-100 ease-linear"
+                      strokeLinecap="round"
                     />
+                  </svg>
+                  {/* 중앙 스피너 및 텍스트 */}
+                  <div className="absolute inset-0 flex items-center justify-center flex-col">
+                     <span className="text-xl font-bold text-white">{displayProgress}%</span>
                   </div>
                 </div>
 
-                <div>
-                  <h4 className="font-semibold mb-2">제목</h4>
-                  <p className="text-foreground">{status.result.title}</p>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold mb-2">요약</h4>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {status.result.summary}
+                <div className="text-center space-y-2 w-full">
+                  <h3 className="text-lg font-bold text-white animate-pulse">
+                    {status?.currentStep || 'AI가 영상을 제작하고 있어요...'}
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    조금만 기다려주세요. 멋진 영상을 만들고 있습니다.
                   </p>
-                </div>
-
-                <Button onClick={handleDownload} className="w-full" size="lg">
-                  <Download className="mr-2 h-4 w-4" />
-                  영상 다운로드
-                </Button>
-              </div>
-            )}
-
-            {status.status === 'failed' && (
-              <div className="mt-4 p-4 bg-destructive/10 text-destructive rounded-lg flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold">변환 실패</p>
-                  <p className="text-sm">{status.error || '알 수 없는 오류가 발생했습니다.'}</p>
+                  
+                  {/* 팁 메시지 롤링 */}
+                  <div className="mt-6 p-4 bg-gray-900/50 rounded-lg border border-gray-800 text-xs text-gray-400 leading-relaxed">
+                    <p className="font-bold text-[#4f84f5] mb-1">💡 알아두세요</p>
+                    영상 생성에는 약 2~3분이 소요됩니다.<br/>
+                    창을 닫지 말고 잠시만 기다려주세요.
+                  </div>
                 </div>
               </div>
             )}
 
-            {status.status !== 'completed' && status.status !== 'failed' && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>처리 중입니다. 잠시만 기다려주세요...</span>
+            {/* 완료 상태 (결과물) */}
+            {status?.status === 'completed' && status.result && (
+              <div className="w-full max-w-[360px] space-y-4 animate-in fade-in zoom-in duration-300">
+                 <div className="relative w-full aspect-[9/16] bg-black rounded-2xl shadow-2xl overflow-hidden ring-1 ring-gray-800">
+                    <video
+                      src={status.result.videoUrl}
+                      controls
+                      className="w-full h-full object-cover"
+                      autoPlay
+                      loop
+                      playsInline
+                    />
+                 </div>
+                 
+                 <div className="space-y-2">
+                   <div className="flex items-center justify-between">
+                     <h3 className="text-white font-bold truncate flex-1 mr-2">{status.result.title}</h3>
+                   </div>
+                   <p className="text-sm text-gray-400 line-clamp-2">{status.result.summary}</p>
+                 </div>
+
+                 <button 
+                    onClick={handleDownload}
+                    className="w-full bg-[#4f84f5] hover:bg-[#4574e5] text-white py-3 rounded-xl font-bold transition-colors text-sm flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    <Download className="h-4 w-4" />
+                    영상 다운로드
+                  </button>
               </div>
             )}
+
+             {/* 실패 상태 */}
+             {status?.status === 'failed' && (
+               <div className="text-center p-6">
+                  <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4 opacity-80" />
+                  <p className="text-lg font-bold text-white mb-2">영상 생성 실패</p>
+                  <p className="text-gray-400 mb-6 max-w-xs mx-auto">
+                    {status.error || '알 수 없는 오류가 발생했습니다.'}
+                  </p>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="px-6 py-2 border border-gray-700 text-white rounded-xl hover:bg-gray-900 transition-colors text-sm"
+                  >
+                    다시 시도
+                  </button>
+               </div>
+             )}
           </div>
-        </Card>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
