@@ -73,40 +73,40 @@ ${truncatedContent}
 【Grok Imagine 프롬프트 작성법】
 
 **핵심 원칙**:
-- **50-200 단어** (600-700자) 이내로 간결하게
+- **50-200 단어** 이내로 간결하게
 - **첫 20-30 단어에 핵심 집중** (Grok은 앞부분 우선 처리)
-- **하나의 장면, 하나의 감정**에 집중 (busy 장면 X)
-- 타임스탬프(0-2s 등), Fast cut 지시어 **사용 금지** (Grok이 자동 처리)
+- **빠른 전환(quick cuts)은 필수** - 바이럴 쇼츠의 핵심!
+- 타임스탬프(0-2s 등) 대신 **"quick cuts between"** 형태로 표현
 
-**필수 구조: Subject + Action + Setting + Style + Camera**
-예: "Korean woman + looking worried + modern Korean living room + cinematic warm lighting + close-up shot"
+**필수 구조: Subject + Action + Setting + Style + Camera + Pacing**
+- Pacing 키워드 필수: quick cuts, fast-paced, dynamic sequence, rapid montage
 
 **한국형 키워드**:
 - 인물: Korean woman, Korean man, Korean doctor, Korean patient
 - 장소: modern Korean clinic, Korean hospital, Korean home interior
 - 스타일: Korean drama aesthetic, warm soft lighting, cinematic 4K
 - 감정: worried, anxious, hopeful, relieved, smiling
+- 전환: quick cuts, fast-paced editing, dynamic transitions
 
-【Grok Imagine용 간결한 프롬프트 예시】
+【Grok Imagine용 프롬프트 예시 - 빠른 전환 포함】
 
 훅(Hook) 클립:
-"Worried Korean woman in her 30s looking at smartphone with anxious expression, sitting in modern Korean living room, soft warm indoor lighting, close-up shot, Korean drama aesthetic, cinematic 4K"
+"Fast-paced montage of worried Korean woman, quick cuts between: checking smartphone anxiously, touching forehead with concern, looking out window pensively. Modern Korean home interior, soft dramatic lighting, close-up shots, Korean drama aesthetic, cinematic 4K"
 
 전개(Development) 클립:
-"Friendly Korean male doctor in white coat explaining to patient in modern Korean clinic, pointing at monitor screen, professional bright lighting, medium shot, warm and trustworthy atmosphere, 4K quality"
+"Dynamic sequence in Korean medical clinic, quick cuts between: Korean doctor in white coat greeting patient warmly, pointing at monitor explaining diagnosis, writing notes confidently. Bright professional lighting, medium shots, trustworthy atmosphere, 4K quality"
 
 결론(Resolution) 클립:
-"Relieved Korean patient smiling and bowing to doctor in clinic, then walking out of modern Korean hospital building exterior, bright sunny day, hopeful uplifting mood, wide to medium shot, cinematic 4K"
+"Uplifting montage of relief, quick cuts between: Korean patient smiling with hope, bowing to doctor gratefully, walking out of modern Korean hospital into bright sunlight. Warm hopeful mood, mixed wide and close-up shots, cinematic 4K"
 
 【프롬프트 작성 체크리스트】
-- ✅ 50-200 단어 이내
-- ✅ 첫 문장에 핵심 주체와 감정 명시
+- ✅ 50-200 단어 이내 (간결하게)
+- ✅ 첫 문장에 "fast-paced" 또는 "quick cuts" 필수
+- ✅ "quick cuts between: A, B, C" 형태로 장면 나열
 - ✅ Korean 키워드로 한국인/한국 배경 명시
-- ✅ 하나의 핵심 장면에 집중
-- ✅ 감정(worried, relieved 등) 명확히
-- ❌ 타임스탬프 사용 금지 (0-2s 등)
-- ❌ Fast cut, montage, rapid transition 등 편집 지시어 금지
-- ❌ 3개 이상 장면 나열 금지
+- ✅ 감정 흐름 명확히 (worried → hopeful → relieved)
+- ❌ 타임스탬프 사용 금지 (0-2s, 2-5s 등)
+- ❌ 과도한 설명 금지 (장면당 5단어 이내)
 
 ═══════════════════════════════════════════════════════════════
 【금지사항】
@@ -119,10 +119,9 @@ ${truncatedContent}
 - 과장된 표현 자제
 
 **Grok Imagine 프롬프트 금지**:
-- 타임스탬프 금지 (0-2s, 2-5s 등)
-- 편집 지시어 금지 (fast cut, montage, rapid transition 등)
-- 여러 장면 나열 금지 (하나의 장면에 집중)
+- 타임스탬프 금지 (0-2s, 2-5s 등) → "quick cuts between" 형태로 대체
 - 200단어 초과 금지
+- 장면당 과도한 설명 금지 (5단어 이내로)
 - 서양인/서양 배경 금지 → 반드시 Korean 키워드 포함
 
 ═══════════════════════════════════════════════════════════════
@@ -136,19 +135,19 @@ ${truncatedContent}
       "title": "훅 - 공감과 궁금증 유발",
       "content": "첫 클립 자막/나레이션 내용 (한국어, 공감가는 문제 제기)",
       "order": 0,
-      "videoPrompt": "Worried Korean woman in her 30s looking at smartphone with anxious expression, sitting in modern Korean living room, soft warm indoor lighting, close-up shot, Korean drama aesthetic, cinematic 4K"
+      "videoPrompt": "Fast-paced montage of worried Korean woman, quick cuts between: checking smartphone anxiously, touching forehead with concern, looking out window pensively. Modern Korean home, soft dramatic lighting, close-ups, Korean drama aesthetic, 4K"
     },
     {
       "title": "전개 - 전문가의 해결책",
       "content": "두 번째 클립 자막/나레이션 (핵심 정보 전달)",
       "order": 1,
-      "videoPrompt": "Friendly Korean male doctor in white coat explaining to patient in modern Korean clinic, pointing at monitor screen, professional bright lighting, medium shot, warm and trustworthy atmosphere, 4K quality"
+      "videoPrompt": "Dynamic sequence in Korean clinic, quick cuts between: Korean doctor greeting patient warmly, pointing at monitor explaining, writing notes confidently. Bright professional lighting, medium shots, trustworthy atmosphere, 4K"
     },
     {
       "title": "결론 - 희망과 행동 유도",
       "content": "세 번째 클립 자막/나레이션 (긍정적 마무리 + CTA)",
       "order": 2,
-      "videoPrompt": "Relieved Korean patient smiling and bowing to doctor in clinic, walking out of modern Korean hospital building exterior, bright sunny day, hopeful uplifting mood, wide shot, cinematic 4K"
+      "videoPrompt": "Uplifting montage of relief, quick cuts between: Korean patient smiling with hope, bowing to doctor gratefully, walking out into bright sunlight. Modern Korean hospital exterior, warm hopeful mood, mixed shots, 4K"
     }
   ],
   "totalDuration": 24
@@ -156,14 +155,12 @@ ${truncatedContent}
 
 **Grok Imagine 체크리스트**:
 ✅ 50-200 단어 이내 간결한 프롬프트
-✅ 첫 20-30 단어에 핵심 (주체 + 감정) 명시
+✅ 첫 문장에 "fast-paced" 또는 "quick cuts" 포함
+✅ "quick cuts between: A, B, C" 형태로 빠른 전환 표현
 ✅ "Korean" 키워드로 한국인/한국 배경 명시
-✅ 하나의 장면, 하나의 감정에 집중
-✅ Subject + Action + Setting + Style + Camera 구조
-✅ 감정 키워드 명확히 (worried, relieved, hopeful 등)
-❌ 타임스탬프 사용 금지 (0-2s 등)
-❌ Fast cut, montage 등 편집 지시어 금지
-❌ 여러 장면 나열 금지`;
+✅ 감정 흐름 (worried → hopeful → relieved)
+✅ 장면당 5단어 이내로 간결하게
+❌ 타임스탬프 사용 금지 (0-2s 등)`;
 
     try {
       // Responses API 사용 (GPT-5 시리즈 권장)
