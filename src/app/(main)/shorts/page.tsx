@@ -108,7 +108,7 @@ export default function ShortsPage() {
 
       console.log('[쇼츠 생성] ✅ Step 1 완료: 작업 ID =', data.jobId);
       setJobId(data.jobId);
-      
+
       setStatus({
         jobId: data.jobId,
         status: 'pending',
@@ -117,16 +117,21 @@ export default function ShortsPage() {
       });
 
       console.log('[쇼츠 생성] 🚀 Step 2/4: 변환 프로세스 시작...');
-      const processResponse = await fetch(`/api/shorts/process/${data.jobId}`, {
+      // process API를 fire-and-forget으로 호출 (await 없이)
+      // 바로 polling을 시작해서 실시간 진행 상황을 표시
+      fetch(`/api/shorts/process/${data.jobId}`, {
         method: 'POST',
+      }).then(async (processResponse) => {
+        if (!processResponse.ok) {
+          const errorData = await processResponse.json();
+          console.error(`[쇼츠 생성] Process API 실패: ${errorData.error}`);
+        }
+      }).catch((err) => {
+        console.error('[쇼츠 생성] Process API 오류:', err);
       });
 
-      if (!processResponse.ok) {
-        const errorData = await processResponse.json();
-        throw new Error(`Process API 실패 (${processResponse.status}): ${errorData.error || '알 수 없는 오류'}`);
-      }
-
       console.log('[쇼츠 생성] 🔄 Step 3/4: 상태 모니터링 시작...');
+      // 바로 polling 시작 (process 완료를 기다리지 않음)
       startPolling(data.jobId);
     } catch (error: any) {
       console.error('[쇼츠 생성] ❌ 오류 발생:', error.message);
