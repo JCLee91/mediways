@@ -308,8 +308,9 @@ export async function GET(
           ? {
               videoUrl: conversion.final_video_url,
               duration: conversion.video_duration,
-              title: conversion.blog_title,
+              title: conversion.shorts_title || conversion.blog_title,
               summary: conversion.summary,
+              segments: conversion.segments,
             }
           : null,
       error: conversion.error_message,

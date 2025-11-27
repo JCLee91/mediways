@@ -93,6 +93,12 @@ export class ShortsScriptGeneratorService {
 
     console.log('[ShortsScript] 2단계: 대본 생성 시작...');
     const scriptDraft = await this.generateScriptDraft(title, truncatedContent, plan);
+    
+    // 요약 내용 안전장치
+    if (!scriptDraft.summary) {
+      scriptDraft.summary = `${plan.procedureName}에 대한 핵심 요약입니다.`;
+    }
+    
     console.log('[ShortsScript] 2단계 완료:', scriptDraft.shortsTitle);
 
     // 3단계 시작 알림
@@ -296,28 +302,29 @@ ${segmentsInfo}
 ★ 8초 클립 = 3컷 (빠른 전환 필수)
 ★ 600-700자 영문 권장
 
-【필수 포함 요소】
+【필수 포함 요소 - Hyper-Realism 강화】
 1. Quick cuts, fast-paced (빠른 전환)
 2. 구체적 장면 3개 (각 3단어)
 3. Korean 환경 (clinic, hospital, setting)
 4. 감정/분위기 (dramatic, hopeful, professional 등)
-5. cinematic 4K
+5. ★ Style Keywords (필수): "hyper-realistic, photorealistic, 8k resolution, highly detailed, sharp focus, Unreal Engine 5 style, ray tracing, cinematic lighting, depth of field"
 6. "no text, no titles, no captions" (글자 생성 금지!)
 
 【주제별 시각 요소】
 - 안과: 시력표, 눈 검사, 안과 장비, 안경 벗는 장면
-- 피부과: 피부 클로즈업, 레이저 시술, 거울 보는 장면
+- 피부과: 피부 클로즈업(모공까지 보일 정도의 디테일), 레이저 시술, 거울 보는 장면
 - 성형외과: 상담 장면, 고민 표정, 자신감 있는 모습
 - 통증의학과: 통증 표정, 치료 장면, 활동하는 모습
 - 치과: 치아 클로즈업, 치과 체어, 미소 짓는 장면
 
 【프롬프트 형식 예시】
-"Quick cuts, fast-paced montage: [장면1 3단어], [장면2 3단어], [장면3 3단어]. Korean [의료시설], [감정] atmosphere, cinematic lighting, 4K quality, no text, no titles, no captions"
+"Quick cuts, fast-paced montage: [장면1], [장면2], [장면3]. Korean [의료시설], [감정] atmosphere, hyper-realistic, photorealistic, 8k, highly detailed, cinematic lighting, depth of field, no text, no titles, no captions"
 
-❌ 절대 금지:
-- 텍스트/글자/자막 생성 요청 (AI가 글자를 깨뜨림)
+❌ 절대 금지 (Negative Constraints):
+- 텍스트/글자/자막 생성 요청
 - 한글 프롬프트
 - 추상적 표현
+- cartoon, illustration, anime, 3d render style, painting, drawing, sketch (오직 실사만!)
 
 ═══════════════════════════════════════════════════════════════
 【출력 형식 (JSON)】
@@ -370,7 +377,7 @@ ${segmentsInfo}
   private async callAI(prompt: string): Promise<string> {
     try {
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-5-mini',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
