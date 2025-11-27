@@ -34,10 +34,10 @@ export default function ShortsPage() {
   const [status, setStatus] = useState<ConversionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // 부드러운 진행률 표시를 위한 state
   const [displayProgress, setDisplayProgress] = useState(0);
-  
+
   // 인풋 섹션의 높이를 추적하기 위한 ref
   const inputSectionRef = useRef<HTMLDivElement>(null);
   const [inputSectionHeight, setInputSectionHeight] = useState<number | null>(null);
@@ -62,6 +62,42 @@ export default function ShortsPage() {
     };
   }, []);
 
+  // 로컬 스토리지에서 작업 ID 복원 및 폴링 재개
+  useEffect(() => {
+    const savedJobId = localStorage.getItem('latestShortsJobId');
+    if (savedJobId) {
+      console.log('[쇼츠 생성] 💾 저장된 작업 발견:', savedJobId);
+      setJobId(savedJobId);
+      setIsLoading(true);
+
+      // 상태 복원 및 폴링 시작
+      fetch(`/api/shorts/status/${savedJobId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            // 작업이 없거나 오류가 있으면 스토리지 초기화
+            localStorage.removeItem('latestShortsJobId');
+            setIsLoading(false);
+            return;
+          }
+
+          setStatus(data);
+
+          // 완료된 작업이 아니면 폴링 시작
+          if (data.status !== 'completed' && data.status !== 'failed') {
+            startPolling(savedJobId);
+          } else {
+            setIsLoading(false);
+            if (data.status === 'completed') setDisplayProgress(100);
+          }
+        })
+        .catch(err => {
+          console.error('상태 복원 실패:', err);
+          setIsLoading(false);
+        });
+    }
+  }, []);
+
   // 부드러운 진행률 업데이트
   useEffect(() => {
     if (!status) {
@@ -70,7 +106,7 @@ export default function ShortsPage() {
     }
 
     const targetProgress = status.progress;
-    
+
     // 이미 목표치에 도달했으면 중단
     if (displayProgress >= targetProgress) return;
 
@@ -90,7 +126,7 @@ export default function ShortsPage() {
 
   const handleSubmit = async () => {
     if (!blogUrl) return;
-    
+
     console.log('[쇼츠 생성] 🎬 시작:', blogUrl);
 
     flushSync(() => {
@@ -116,6 +152,7 @@ export default function ShortsPage() {
 
       console.log('[쇼츠 생성] ✅ Step 1 완료: 작업 ID =', data.jobId);
       setJobId(data.jobId);
+      localStorage.setItem('latestShortsJobId', data.jobId);
 
       setStatus({
         jobId: data.jobId,
@@ -194,7 +231,7 @@ export default function ShortsPage() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row gap-2 p-1 sm:p-2">
       {/* Left side input */}
-      <div 
+      <div
         ref={inputSectionRef}
         className="w-full lg:w-[320px] xl:w-[360px] bg-black rounded-2xl p-4 sm:p-6"
       >
@@ -229,25 +266,25 @@ export default function ShortsPage() {
                 </div>
               </div>
             )}
-            
+
             {/* 진행 상태 표시 (작업 시작 후) */}
             {status && status.status !== 'completed' && status.status !== 'failed' && (
-               <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
-                 <SimpleProcessStepper status={status.status} />
-                 <div className="mt-4 flex justify-between items-center text-xs text-gray-400">
-                   <span>{status.currentStep}</span>
-                   <span>{displayProgress}%</span>
-                 </div>
-                 <div className="mt-2 h-1 w-full bg-gray-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[#4f84f5] transition-all duration-500 ease-out"
-                      style={{ width: `${displayProgress}%` }}
-                    />
-                  </div>
-               </div>
+              <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
+                <SimpleProcessStepper status={status.status} />
+                <div className="mt-4 flex justify-between items-center text-xs text-gray-400">
+                  <span>{status.currentStep}</span>
+                  <span>{displayProgress}%</span>
+                </div>
+                <div className="mt-2 h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#4f84f5] transition-all duration-500 ease-out"
+                    style={{ width: `${displayProgress}%` }}
+                  />
+                </div>
+              </div>
             )}
 
-            <button 
+            <button
               onClick={handleSubmit}
               disabled={isProcessing || !blogUrl}
               className="w-full bg-[#4f84f5] hover:bg-[#4574e5] disabled:bg-gray-800 disabled:text-gray-500 text-white py-3 sm:py-3.5 rounded-xl font-bold transition-colors text-sm flex items-center justify-center gap-2"
@@ -271,10 +308,10 @@ export default function ShortsPage() {
       {/* Right side output */}
       <div className="flex-1 flex items-start justify-center mt-2 lg:mt-0">
         <div className="w-full max-w-none">
-          <div 
+          <div
             className="bg-black border border-gray-800 rounded-2xl p-4 sm:p-6 relative overflow-hidden min-h-[600px] flex flex-col items-center justify-center"
-            style={inputSectionHeight ? { 
-              minHeight: `${inputSectionHeight}px` 
+            style={inputSectionHeight ? {
+              minHeight: `${inputSectionHeight}px`
             } : undefined}
           >
             {/* 초기 상태 */}
@@ -308,7 +345,7 @@ export default function ShortsPage() {
                   </svg>
                   {/* 중앙 스피너 및 텍스트 */}
                   <div className="absolute inset-0 flex items-center justify-center flex-col">
-                     <span className="text-xl font-bold text-white">{displayProgress}%</span>
+                    <span className="text-xl font-bold text-white">{displayProgress}%</span>
                   </div>
                 </div>
 
@@ -319,11 +356,11 @@ export default function ShortsPage() {
                   <p className="text-gray-400 text-sm">
                     조금만 기다려주세요. 멋진 영상을 만들고 있습니다.
                   </p>
-                  
+
                   {/* 팁 메시지 롤링 */}
                   <div className="mt-6 p-4 bg-gray-900/50 rounded-lg border border-gray-800 text-xs text-gray-400 leading-relaxed">
                     <p className="font-bold text-[#4f84f5] mb-1">💡 알아두세요</p>
-                    영상 생성에는 약 2~3분이 소요됩니다.<br/>
+                    영상 생성에는 약 2~3분이 소요됩니다.<br />
                     창을 닫지 말고 잠시만 기다려주세요.
                   </div>
                 </div>
@@ -335,7 +372,7 @@ export default function ShortsPage() {
               <div className="w-full max-w-[500px] space-y-4 animate-in fade-in zoom-in duration-300">
                 <div className="flex flex-col lg:flex-row gap-4">
                   {/* 영상 */}
-                  <div className="w-full lg:w-[280px] flex-shrink-0">
+                  <div className="w-full max-w-[280px] mx-auto lg:mx-0 lg:w-[280px] flex-shrink-0">
                     <div className="relative w-full aspect-[9/16] bg-black rounded-2xl shadow-2xl overflow-hidden ring-1 ring-gray-800">
                       <video
                         src={status.result.videoUrl}
@@ -351,6 +388,18 @@ export default function ShortsPage() {
                   {/* 제목 + 대본 */}
                   <div className="flex-1 space-y-3">
                     <h3 className="text-white font-bold text-lg line-clamp-2">{status.result.title}</h3>
+
+                    {/* 블로그 요약 표시 */}
+                    {status.result.summary && (
+                      <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                        <p className="text-xs text-gray-400 font-bold mb-2 flex items-center gap-1">
+                          <span className="text-lg">📄</span> 블로그 요약
+                        </p>
+                        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                          {status.result.summary}
+                        </p>
+                      </div>
+                    )}
 
                     {/* 대본 전체 표시 */}
                     {status.result.segments && status.result.segments.length > 0 && (
@@ -381,22 +430,22 @@ export default function ShortsPage() {
               </div>
             )}
 
-             {/* 실패 상태 */}
-             {status?.status === 'failed' && (
-               <div className="text-center p-6">
-                  <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4 opacity-80" />
-                  <p className="text-lg font-bold text-white mb-2">영상 생성 실패</p>
-                  <p className="text-gray-400 mb-6 max-w-xs mx-auto">
-                    {status.error || '알 수 없는 오류가 발생했습니다.'}
-                  </p>
-                  <button 
-                    onClick={() => window.location.reload()}
-                    className="px-6 py-2 border border-gray-700 text-white rounded-xl hover:bg-gray-900 transition-colors text-sm"
-                  >
-                    다시 시도
-                  </button>
-               </div>
-             )}
+            {/* 실패 상태 */}
+            {status?.status === 'failed' && (
+              <div className="text-center p-6">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4 opacity-80" />
+                <p className="text-lg font-bold text-white mb-2">영상 생성 실패</p>
+                <p className="text-gray-400 mb-6 max-w-xs mx-auto">
+                  {status.error || '알 수 없는 오류가 발생했습니다.'}
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-2 border border-gray-700 text-white rounded-xl hover:bg-gray-900 transition-colors text-sm"
+                >
+                  다시 시도
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
