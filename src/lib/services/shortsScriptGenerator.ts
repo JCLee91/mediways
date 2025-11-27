@@ -353,7 +353,6 @@ ${segmentsInfo}
           },
         ],
         response_format: { type: 'json_object' },
-        temperature: 0.7,
       });
 
       const content = response.choices[0]?.message?.content;
