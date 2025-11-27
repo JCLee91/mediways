@@ -85,8 +85,12 @@ export class ShortsScriptGeneratorService {
     const truncatedContent = content.slice(0, 8000);
 
     console.log('[ShortsScript] 1단계: 기획 생성 시작...');
+    console.log(`[ShortsDebug] Input Title: ${title}`);
+    console.log(`[ShortsDebug] Input Content (first 200 chars): ${truncatedContent.slice(0, 200)}...`);
+
     const plan = await this.generatePlan(title, truncatedContent);
     console.log('[ShortsScript] 1단계 완료:', plan.hookType, plan.hookSentence);
+    console.log(`[ShortsDebug] Generated Plan:`, JSON.stringify(plan, null, 2));
 
     // 2단계 시작 알림
     if (onProgress) await onProgress(1);
@@ -100,6 +104,7 @@ export class ShortsScriptGeneratorService {
     }
     
     console.log('[ShortsScript] 2단계 완료:', scriptDraft.shortsTitle);
+    console.log(`[ShortsDebug] Generated Script Draft:`, JSON.stringify(scriptDraft, null, 2));
 
     // 3단계 시작 알림
     if (onProgress) await onProgress(2);
@@ -107,6 +112,7 @@ export class ShortsScriptGeneratorService {
     console.log('[ShortsScript] 3단계: 영상 프롬프트 생성 시작...');
     const finalScript = await this.generateVideoPrompts(plan, scriptDraft);
     console.log('[ShortsScript] 3단계 완료. 전체 완료!');
+    console.log(`[ShortsDebug] Final Script with Prompts:`, JSON.stringify(finalScript, null, 2));
 
     return finalScript;
   }
@@ -295,36 +301,41 @@ Pain Point: ${plan.painPoint}
 ${segmentsInfo}
 
 ═══════════════════════════════════════════════════════════════
-【Grok Imagine 프롬프트 작성 규칙】
+【Grok Imagine 프롬프트 작성 규칙 - Stable High Quality】
 ═══════════════════════════════════════════════════════════════
 
-★ 황금 공식: Action + Subject + Framing + Environment + Lighting + Style
-★ 8초 클립 = 3컷 (빠른 전환 필수)
+★ "안정적이고 선명한 고화질 영상"이 핵심입니다. 복잡한 구도나 과도한 움직임은 영상을 기괴하게 만들 수 있습니다.
+
+★ 황금 공식: Subject + Real Environment + Natural Lighting + Tech Specs + Atmosphere
+★ 8초 클립 = 3컷 (안정적인 장면 전환)
 ★ 600-700자 영문 권장
 
-【필수 포함 요소 - Hyper-Realism 강화】
-1. Quick cuts, fast-paced (빠른 전환)
-2. 구체적 장면 3개 (각 3단어)
-3. Korean 환경 (clinic, hospital, setting)
-4. 감정/분위기 (dramatic, hopeful, professional 등)
-5. ★ Style Keywords (필수): "hyper-realistic, photorealistic, 8k resolution, highly detailed, sharp focus, Unreal Engine 5 style, ray tracing, cinematic lighting, depth of field"
-6. "no text, no titles, no captions" (글자 생성 금지!)
+【필수 포함 요소 - Clean & Realistic】
+1. Tech Specs (필수): "Shot on iPhone 15 Pro, 4k vertical footage, stable footage, sharp focus, high resolution, highly detailed, crystal clear"
+2. Lighting: "Natural window light", "Soft bright clinic lighting", "Clean daylight", "No harsh shadows"
+3. Atmosphere: "Professional", "Clean", "Modern", "Peaceful", "Trustworthy", "Korean clinic setting"
+4. Subject Focus:
+   - 인물보다는 "공간, 사물, 분위기" 위주로 묘사 (AI가 인물 표정을 왜곡하는 것 방지)
+   - 인물 등장 시: 뒷모습, 실루엣, 손 동작, 마스크 착용 등 디테일이 적은 샷 권장
+5. "no text, no titles, no captions" (글자 생성 금지!)
 
-【주제별 시각 요소】
-- 안과: 시력표, 눈 검사, 안과 장비, 안경 벗는 장면
-- 피부과: 피부 클로즈업(모공까지 보일 정도의 디테일), 레이저 시술, 거울 보는 장면
-- 성형외과: 상담 장면, 고민 표정, 자신감 있는 모습
-- 통증의학과: 통증 표정, 치료 장면, 활동하는 모습
-- 치과: 치아 클로즈업, 치과 체어, 미소 짓는 장면
+【주제별 연출 가이드 (안정성 위주)】
+- 안과: 깨끗하고 밝은 안과 내부 전경, 최신 검사 장비의 디테일한 모습, 안경을 테이블에 놓는 손 클로즈업
+- 피부과: 깨끗한 세안실, 고급스러운 스킨케어 제품 진열, 맑고 투명한 피부 텍스처(이목구비 제외)
+- 성형외과: 모던하고 프라이빗한 상담실 인테리어, 편안한 소파, 밝은 창가 풍경
+- 통증의학과: 깔끔한 물리치료실 침대, 정돈된 의료 기구, 따뜻한 찜질팩 이미지
+- 치과: 위생적인 치과 체어, 밝은 조명 아래 반짝이는 치과 도구, 깨끗한 칫솔/치약
 
 【프롬프트 형식 예시】
-"Quick cuts, fast-paced montage: [장면1], [장면2], [장면3]. Korean [의료시설], [감정] atmosphere, hyper-realistic, photorealistic, 8k, highly detailed, cinematic lighting, depth of field, no text, no titles, no captions"
+"Montage of modern clinic atmosphere: [장면1 - Interior], [장면2 - Equipment], [장면3 - Hand detail]. Shot on iPhone 15 Pro, 4k vertical, stable footage, natural daylight, clean white aesthetic, Korean hospital background, sharp focus, high quality, no text, no titles"
 
 ❌ 절대 금지 (Negative Constraints):
-- 텍스트/글자/자막 생성 요청
-- 한글 프롬프트
-- 추상적 표현
-- cartoon, illustration, anime, 3d render style, painting, drawing, sketch (오직 실사만!)
+- CGI, 3D render, Unreal Engine, video game graphics
+- Distorted face, morphing, blurry, bad anatomy, scary, creepy
+- Complex camera movement, fast zoom, shaky camera
+- Selfie, extreme close-up of eyes/mouth (기괴함 유발 원인)
+- Text, subtitles, watermarks
+- (불쾌하거나 왜곡된 이미지 절대 금지!)
 
 ═══════════════════════════════════════════════════════════════
 【출력 형식 (JSON)】
@@ -347,10 +358,14 @@ ${segmentsInfo}
   ]
 }`;
 
+    console.log(`[ShortsDebug] Video Generation Prompt to AI:\n${prompt}`);
+
     const response = await this.callAI(prompt);
     const promptsResult = JSON.parse(response) as {
       videoPrompts: { order: number; prompt: string }[];
     };
+
+    console.log(`[ShortsDebug] Raw AI Response for Video Prompts:`, JSON.stringify(promptsResult, null, 2));
 
     // 대본과 프롬프트 결합
     const segments: ShortSegment[] = scriptDraft.segments.map((seg) => {

@@ -105,17 +105,18 @@ export default function ShortsPage() {
       return;
     }
 
-    const targetProgress = status.progress;
+    const targetProgress = typeof status.progress === 'number' ? status.progress : 0;
 
     // 이미 목표치에 도달했으면 중단
     if (displayProgress >= targetProgress) return;
 
     const step = () => {
       setDisplayProgress(prev => {
-        if (prev >= targetProgress) return targetProgress;
+        const current = typeof prev === 'number' ? prev : 0;
+        if (current >= targetProgress) return targetProgress;
         // 남은 거리의 5%만큼 이동 (점진적 감속)하거나 최소 1씩 증가
-        const increment = Math.max(1, Math.floor((targetProgress - prev) * 0.1));
-        return Math.min(targetProgress, prev + increment);
+        const increment = Math.max(1, Math.floor((targetProgress - current) * 0.1));
+        return Math.min(targetProgress, current + increment);
       });
     };
 
@@ -338,7 +339,7 @@ export default function ShortsPage() {
                       strokeWidth="4"
                       fill="none"
                       strokeDasharray="276.46"
-                      strokeDashoffset={276.46 * (1 - displayProgress / 100)}
+                      strokeDashoffset={(276.46 * (1 - (Number.isNaN(displayProgress) ? 0 : displayProgress) / 100)).toString()}
                       className="transition-all duration-100 ease-linear"
                       strokeLinecap="round"
                     />
@@ -362,6 +363,21 @@ export default function ShortsPage() {
                     <p className="font-bold text-[#4f84f5] mb-1">💡 알아두세요</p>
                     영상 생성에는 약 2~3분이 소요됩니다.<br />
                     창을 닫지 말고 잠시만 기다려주세요.
+                  </div>
+                  
+                  {/* 강제 초기화 버튼 (진행 중 상태일 때만 표시) */}
+                  <div className="mt-4">
+                    <button
+                      onClick={() => {
+                        if (window.confirm('현재 진행 중인 작업을 취소하고 초기화하시겠습니까?')) {
+                          localStorage.removeItem('latestShortsJobId');
+                          window.location.reload();
+                        }
+                      }}
+                      className="text-xs text-gray-500 underline hover:text-gray-300"
+                    >
+                      작업 취소 및 초기화
+                    </button>
                   </div>
                 </div>
               </div>
@@ -439,10 +455,13 @@ export default function ShortsPage() {
                   {status.error || '알 수 없는 오류가 발생했습니다.'}
                 </p>
                 <button
-                  onClick={() => window.location.reload()}
+                  onClick={() => {
+                    localStorage.removeItem('latestShortsJobId');
+                    window.location.reload();
+                  }}
                   className="px-6 py-2 border border-gray-700 text-white rounded-xl hover:bg-gray-900 transition-colors text-sm"
                 >
-                  다시 시도
+                  다시 시도 (저장된 작업 삭제)
                 </button>
               </div>
             )}
