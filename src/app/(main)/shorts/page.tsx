@@ -6,6 +6,13 @@ import { Loader2, Video, Download, AlertCircle, ArrowRight, Copy } from 'lucide-
 import { SimpleProcessStepper } from '@/components/shorts/SimpleProcessStepper';
 import Spinner from '@/components/Spinner';
 
+interface Segment {
+  title: string;
+  content: string;
+  order: number;
+  videoPrompt: string;
+}
+
 interface ConversionStatus {
   jobId: string;
   status: string;
@@ -16,6 +23,7 @@ interface ConversionStatus {
     duration: number;
     title: string;
     summary: string;
+    segments?: Segment[];
   };
   error?: string;
 }
@@ -324,32 +332,52 @@ export default function ShortsPage() {
 
             {/* 완료 상태 (결과물) */}
             {status?.status === 'completed' && status.result && (
-              <div className="w-full max-w-[360px] space-y-4 animate-in fade-in zoom-in duration-300">
-                 <div className="relative w-full aspect-[9/16] bg-black rounded-2xl shadow-2xl overflow-hidden ring-1 ring-gray-800">
-                    <video
-                      src={status.result.videoUrl}
-                      controls
-                      className="w-full h-full object-cover"
-                      autoPlay
-                      loop
-                      playsInline
-                    />
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <div className="flex items-center justify-between">
-                     <h3 className="text-white font-bold truncate flex-1 mr-2">{status.result.title}</h3>
-                   </div>
-                   <p className="text-sm text-gray-400 line-clamp-2">{status.result.summary}</p>
-                 </div>
+              <div className="w-full max-w-[500px] space-y-4 animate-in fade-in zoom-in duration-300">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* 영상 */}
+                  <div className="w-full lg:w-[280px] flex-shrink-0">
+                    <div className="relative w-full aspect-[9/16] bg-black rounded-2xl shadow-2xl overflow-hidden ring-1 ring-gray-800">
+                      <video
+                        src={status.result.videoUrl}
+                        controls
+                        className="w-full h-full object-cover"
+                        autoPlay
+                        loop
+                        playsInline
+                      />
+                    </div>
+                  </div>
 
-                 <button 
-                    onClick={handleDownload}
-                    className="w-full bg-[#4f84f5] hover:bg-[#4574e5] text-white py-3 rounded-xl font-bold transition-colors text-sm flex items-center justify-center gap-2 shadow-lg"
-                  >
-                    <Download className="h-4 w-4" />
-                    영상 다운로드
-                  </button>
+                  {/* 제목 + 대본 */}
+                  <div className="flex-1 space-y-3">
+                    <h3 className="text-white font-bold text-lg line-clamp-2">{status.result.title}</h3>
+
+                    {/* 대본 전체 표시 */}
+                    {status.result.segments && status.result.segments.length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-xs text-gray-500 font-medium">📝 대본</p>
+                        {status.result.segments
+                          .sort((a, b) => a.order - b.order)
+                          .map((segment, idx) => (
+                            <div key={idx} className="bg-gray-900/50 rounded-lg p-3 border border-gray-800">
+                              <p className="text-xs text-[#4f84f5] font-medium mb-1">
+                                {idx === 0 ? '🎬 훅 (0-8초)' : idx === 1 ? '💡 정보 (8-16초)' : '✅ CTA (16-24초)'}
+                              </p>
+                              <p className="text-sm text-gray-300 leading-relaxed">{segment.content}</p>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleDownload}
+                  className="w-full bg-[#4f84f5] hover:bg-[#4574e5] text-white py-3 rounded-xl font-bold transition-colors text-sm flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <Download className="h-4 w-4" />
+                  영상 다운로드
+                </button>
               </div>
             )}
 

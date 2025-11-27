@@ -9,6 +9,7 @@ interface ShortSegment {
 }
 
 interface ShortsScript {
+  shortsTitle: string;
   summary: string;
   segments: ShortSegment[];
   totalDuration: number;
@@ -114,6 +115,7 @@ ${truncatedContent}
 ═══════════════════════════════════════════════════════════════
 
 {
+  "shortsTitle": "쇼츠 제목 (15자 이내, 호기심 유발, 시술명/질환명 포함)",
   "summary": "블로그 핵심 요약 (시술명/질환명 + 핵심 정보 2-3개)",
   "segments": [
     {
@@ -141,6 +143,7 @@ ${truncatedContent}
 ═══════════════════════════════════════════════════════════════
 【최종 체크】
 ═══════════════════════════════════════════════════════════════
+✅ shortsTitle이 15자 이내이고 호기심을 유발하는가?
 ✅ 훅이 블로그의 구체적 내용인가? (일반적 X)
 ✅ 시술명/질환명이 대본에 포함되었나?
 ✅ 블로그의 숫자/수치가 활용되었나?

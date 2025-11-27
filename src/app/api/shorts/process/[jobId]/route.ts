@@ -88,6 +88,7 @@ export async function POST(
     await supabase
       .from('shorts_conversions')
       .update({
+        shorts_title: script.shortsTitle,
         summary: script.summary,
         segments: script.segments,
       })
