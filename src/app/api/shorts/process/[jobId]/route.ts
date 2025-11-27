@@ -6,7 +6,7 @@ import { GrokImagineService } from '@/lib/services/grokImagineService';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-export const maxDuration = 180; // 3분 (3단계 AI 호출: 기획→대본→영상프롬프트)
+export const maxDuration = 300; // 5분 (Vercel Pro 최대치)
 
 export async function POST(
   request: NextRequest,
