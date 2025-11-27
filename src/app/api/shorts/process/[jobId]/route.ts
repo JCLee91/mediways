@@ -6,7 +6,7 @@ import { GrokImagineService } from '@/lib/services/grokImagineService';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // 1분 (영상 생성 요청만)
+export const maxDuration = 180; // 3분 (3단계 AI 호출: 기획→대본→영상프롬프트)
 
 export async function POST(
   request: NextRequest,
@@ -70,18 +70,28 @@ export async function POST(
 
     await updateProgress(jobId, 'crawling', 20, '블로그 분석이 완료되었습니다.');
 
-    // 2. AI 요약 (20-40%)
-    await updateProgress(jobId, 'summarizing', 25, 'AI가 영상 대본을 작성하고 있습니다...');
-
+    // 2. AI 3단계 생성 (20-40%)
     const openaiApiKey = process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
       throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
     }
 
     const scriptGenerator = new ShortsScriptGeneratorService(openaiApiKey);
+
+    // 진행 상황 콜백으로 3단계 진행률 표시
+    await updateProgress(jobId, 'summarizing', 22, '1/3 단계: 쇼츠 기획 중...');
+
     const script = await scriptGenerator.generateScript(
       crawlResult.title,
-      crawlResult.content
+      crawlResult.content,
+      // 진행 상황 콜백
+      async (stage: number) => {
+        if (stage === 1) {
+          await updateProgress(jobId, 'summarizing', 28, '2/3 단계: 대본 작성 중...');
+        } else if (stage === 2) {
+          await updateProgress(jobId, 'summarizing', 34, '3/3 단계: 영상 프롬프트 생성 중...');
+        }
+      }
     );
     console.log(`[Process] Job ${jobId}: Script generated. Segments: ${script.segments.length}`);
 
@@ -94,7 +104,7 @@ export async function POST(
       })
       .eq('id', jobId);
 
-    await updateProgress(jobId, 'summarizing', 40, '대본 작성이 완료되었습니다.');
+    await updateProgress(jobId, 'summarizing', 40, '대본 및 영상 프롬프트 생성 완료!');
 
     // 3. 영상 생성 요청 (3개 개별 생성)
     await updateProgress(jobId, 'generating_video', 45, 'AI 영상 생성을 시작합니다...');

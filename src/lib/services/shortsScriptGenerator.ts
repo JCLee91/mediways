@@ -61,16 +61,26 @@ export class ShortsScriptGeneratorService {
   // ═══════════════════════════════════════════════════════════════
   // 메인 함수: 3단계 순차 실행
   // ═══════════════════════════════════════════════════════════════
-  async generateScript(title: string, content: string): Promise<ShortsScript> {
+  async generateScript(
+    title: string,
+    content: string,
+    onProgress?: (stage: number) => Promise<void>
+  ): Promise<ShortsScript> {
     const truncatedContent = content.slice(0, 8000);
 
     console.log('[ShortsScript] 1단계: 기획 생성 시작...');
     const plan = await this.generatePlan(title, truncatedContent);
     console.log('[ShortsScript] 1단계 완료:', plan.hookType, plan.hookSentence);
 
+    // 2단계 시작 알림
+    if (onProgress) await onProgress(1);
+
     console.log('[ShortsScript] 2단계: 대본 생성 시작...');
     const scriptDraft = await this.generateScriptDraft(title, truncatedContent, plan);
     console.log('[ShortsScript] 2단계 완료:', scriptDraft.shortsTitle);
+
+    // 3단계 시작 알림
+    if (onProgress) await onProgress(2);
 
     console.log('[ShortsScript] 3단계: 영상 프롬프트 생성 시작...');
     const finalScript = await this.generateVideoPrompts(plan, scriptDraft);
