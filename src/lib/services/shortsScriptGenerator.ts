@@ -1,5 +1,21 @@
 import OpenAI from 'openai';
-import { medicalLawSystemPrompt } from '@/lib/prompts/medical-law-prompt';
+
+// 쇼츠 전용 경량화 의료법 프롬프트 (24초 영상에 맞춤)
+const shortsMedialLawPrompt = `
+【의료광고 준수 - 쇼츠 버전】
+
+⛔ 금지:
+- 완치, 100%, 보장, 최고, 최초
+- 환자 후기, 전후 사진, 가격
+
+✅ 자연스럽게 1회만 포함:
+- 대본 마지막에 "개인차가 있을 수 있어요" 또는 "전문 상담 추천해요" 중 택1
+- 과도한 면책 조항 반복 금지 (쇼츠는 24초라 1회면 충분)
+
+📝 어투:
+- 단정 금지 (~입니다 X → ~할 수 있어요 O)
+- 자연스럽고 빠른 말투 유지
+`;
 
 // ═══════════════════════════════════════════════════════════════
 // 타입 정의
@@ -95,7 +111,7 @@ export class ShortsScriptGeneratorService {
   private async generatePlan(title: string, content: string): Promise<ShortsPlan> {
     const prompt = `당신은 100만 뷰 바이럴 쇼츠 전문 기획자입니다.
 
-${medicalLawSystemPrompt}
+${shortsMedialLawPrompt}
 
 ═══════════════════════════════════════════════════════════════
 【블로그 분석 대상】
@@ -169,7 +185,7 @@ ${content}
   ): Promise<ShortsScriptDraft> {
     const prompt = `당신은 바이럴 쇼츠 대본 작가입니다. 기획안을 바탕으로 대본을 작성합니다.
 
-${medicalLawSystemPrompt}
+${shortsMedialLawPrompt}
 
 ═══════════════════════════════════════════════════════════════
 【기획안】
