@@ -57,7 +57,20 @@ export async function POST(
     console.log(`[Process] Job ${jobId}: Starting background processing for ${blogUrl}`);
 
     // 백그라운드 작업 시작
-    after(async () => {
+    
+    // unstable_after가 없는 경우를 대비한 호환성 처리
+    const safeAfter = (task: () => Promise<void>) => {
+      // @ts-ignore
+      if (typeof after === 'function') {
+        after(task);
+      } else {
+        // Next.js 버전에 따라 after가 없을 수 있음. 이 경우 그냥 실행 (응답 지연 발생 가능)
+        console.warn('[Process] unstable_after is not available. Running task directly.');
+        task().catch(err => console.error('Background task error:', err));
+      }
+    };
+
+    safeAfter(async () => {
       try {
         console.log(`[Process] Job ${jobId}: Background task started`);
 
@@ -65,7 +78,12 @@ export async function POST(
         await updateProgress(jobId, 'crawling', 5, '블로그 내용을 분석하고 있습니다...');
 
         const crawlResult = await BlogCrawlerService.crawlNaverBlog(blogUrl);
-        console.log(`[Process] Job ${jobId}: Crawl complete. Title: ${crawlResult.title}`);
+        console.log(`[Process] Job ${jobId}: Crawl complete. Title: ${crawlResult.title}, Length: ${crawlResult.content.length}`);
+
+        // 본문 추출 실패 또는 Fallback 메시지 감지 시 에러 처리
+        if (crawlResult.content.length < 200 || crawlResult.content.includes('본문을 찾지 못했습니다')) {
+          throw new Error('블로그 본문을 가져오지 못했습니다. (네이버 블로그 접근 제한 또는 비공개 글일 수 있습니다)');
+        }
 
         await supabase
           .from('shorts_conversions')
@@ -125,17 +143,17 @@ export async function POST(
         const grokService = new GrokImagineService(kieApiKey);
         const segments = script.segments;
 
-        // 3개 영상 개별 생성 (extend 사용 안 함)
-        const taskIds = [];
-        for (const segment of segments) {
+        // 3개 영상 개별 생성 (병렬 요청으로 속도 개선)
+        const taskPromises = segments.map(async (segment) => {
           console.log(`[Process] Job ${jobId}: Requesting video for segment... Prompt: ${segment.videoPrompt.substring(0, 50)}...`);
-          const taskId = await grokService.generateVideo({
+          return grokService.generateVideo({
             prompt: segment.videoPrompt,
             aspectRatio: '9:16',
             mode: 'normal',
           });
-          taskIds.push(taskId);
-        }
+        });
+
+        const taskIds = await Promise.all(taskPromises);
 
         // taskIds 저장 (JSON 문자열로)
         await supabase

@@ -213,8 +213,9 @@ export async function GET(
                 } else {
                   console.warn(`[Status] Task ${taskId} success but no URLs found.`);
                 }
-              } else if (data.state === 'failed') {
-                const failMsg = data.failMsg || 'Unknown error';
+              } else if (data.state === 'fail' || data.state === 'failed') {
+                // Grok Imagine API returns 'fail' state sometimes
+                const failMsg = data.failMsg || `Task failed with state: ${data.state}`;
                 console.error(`[Status] Task ${taskId} failed: ${failMsg}`);
                 throw new Error(`영상 생성 실패: ${failMsg}`);
               } else {

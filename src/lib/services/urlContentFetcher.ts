@@ -70,8 +70,21 @@ function extractMainContent(html: string): string {
   for (const pattern of containerPatterns) {
     const match = html.match(pattern);
     if (match && match[1]) {
-      return stripHtml(match[1]);
+      const content = stripHtml(match[1]);
+      // 본문이 너무 짧으면(예: 로딩 스크립트만 있는 경우) 다음 패턴 시도
+      if (content.length > 100) {
+        return content;
+      }
     }
+  }
+  
+  // iframe이 있는 경우 (네이버 블로그 구형 스킨 대응)
+  const iframeMatch = html.match(/<iframe[^>]*id=\"mainFrame\"[^>]*src=\"([^\"]*)\"[^>]*>/i);
+  if (iframeMatch && iframeMatch[1]) {
+    // 메인 프레임 URL을 찾았지만, 여기서는 재요청을 보낼 수 없으므로
+    // 호출부에서 처리하도록 빈 문자열 반환하거나 별도 처리 필요
+    // 현재 구조상으로는 일단 빈 문자열 반환하여 RSS 폴백 유도
+    return '';
   }
 
   return stripHtml(html);
@@ -145,6 +158,50 @@ async function fetchFromNaverRSS(blogId: string, logNo?: string): Promise<PageCo
   }
 }
 
+async function fetchFromMobileNaver(blogId: string, logNo: string): Promise<PageContent | null> {
+  try {
+    const mobileUrl = `https://m.blog.naver.com/${blogId}/${logNo}`;
+    const response = await fetch(mobileUrl, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    });
+
+    if (!response.ok) return null;
+
+    const html = await response.text();
+    const title = extractTitle(html);
+    
+    // 모바일 뷰 전용 본문 추출 패턴
+    const mobileContentPatterns = [
+      /<div[^>]*class=\"[^\"]*se-main-container[^\"]*\"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*class=\"post_ct\"[^>]*>([\s\S]*?)<\/div>/i,
+      /<div[^>]*id=\"viewTypeSelector\"[^>]*>([\s\S]*?)<\/div>/i
+    ];
+
+    let content = '';
+    for (const pattern of mobileContentPatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        content = stripHtml(match[1]);
+        if (content.length > 50) break;
+      }
+    }
+
+    if (!content || content.length < 50) return null;
+
+    return {
+      title: title || '제목 없음',
+      content,
+      description: extractDescription(html)
+    };
+  } catch (e) {
+    console.error('Mobile fetch failed:', e);
+    return null;
+  }
+}
+
 export async function fetchPageContent(targetUrl: string): Promise<PageContent | null> {
   if (typeof fetch === 'undefined') {
     return null;
@@ -161,7 +218,12 @@ export async function fetchPageContent(targetUrl: string): Promise<PageContent |
     });
 
     if (!response.ok) {
-      if (blogId) {
+      // 1차 시도 실패 시 모바일 URL 시도
+      if (blogId && logNo) {
+        const mobileContent = await fetchFromMobileNaver(blogId, logNo);
+        if (mobileContent) return mobileContent;
+
+        // 모바일도 실패하면 RSS 시도
         const rssFallback = await fetchFromNaverRSS(blogId, logNo);
         if (rssFallback) return rssFallback;
       }
@@ -173,7 +235,11 @@ export async function fetchPageContent(targetUrl: string): Promise<PageContent |
     const description = extractDescription(html);
     const content = extractMainContent(html);
 
-    if ((!content || content.length < 50) && blogId) {
+    if ((!content || content.length < 50) && blogId && logNo) {
+      // PC 뷰 파싱 실패 시 모바일 URL 시도
+      const mobileContent = await fetchFromMobileNaver(blogId, logNo);
+      if (mobileContent) return mobileContent;
+
       const fallback = await fetchFromNaverRSS(blogId, logNo);
       if (fallback) {
         return fallback;
@@ -191,7 +257,10 @@ export async function fetchPageContent(targetUrl: string): Promise<PageContent |
     try {
       const parsed = new URL(targetUrl);
       const { blogId, logNo } = extractNaverBlogInfo(parsed);
-      if (blogId) {
+      if (blogId && logNo) {
+        const mobileContent = await fetchFromMobileNaver(blogId, logNo);
+        if (mobileContent) return mobileContent;
+
         const fallback = await fetchFromNaverRSS(blogId, logNo);
         if (fallback) return fallback;
       }
