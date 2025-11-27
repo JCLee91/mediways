@@ -16,6 +16,9 @@ function createPlaceholderContent(url: string): PageContent {
 
 function stripHtml(html: string): string {
   return html
+    // CDATA 태그 제거 (내용은 유지)
+    .replace(/<!\[CDATA\[/gi, '')
+    .replace(/\]\]>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
